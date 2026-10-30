@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   // Private capability URLs must not be printed by development request logs.
   logging: { incomingRequests: false, browserToTerminal: false },
   async headers() {
-    return ["/patient/track/:path*", "/api/requests/:path*"].map((source) => ({
+    return ["/patient/track/:path*", "/api/requests/:path*", "/dentist/:path*", "/api/dentist/:path*"].map((source) => ({
       source,
       headers: [
         { key: "Cache-Control", value: "private, no-store, max-age=0" },

@@ -8,10 +8,11 @@ The application includes:
 
 - `/` — USJ TeleDent homepage with Patient Portal and Dentist Portal links.
 - `/patient` — mobile-first French patient interface with a local multi-step form.
-- `/dentist` — desktop-first dentist placeholder.
+- `/dentist/login` — French local dentist login.
+- `/dentist` — protected dentist dashboard, scoped to the account's department.
 - `/patient/track/<private-token>` — private tracking page for a saved local request.
 
-Step 4 adds local request submission, filesystem persistence, and private tracking to the approved French patient form. Step 2 Supabase files remain prepared but **not deployed**. Do not connect Supabase or supply database credentials. Dentist login, dashboard, clinical evaluation, responses, and notifications are not implemented. Development stops after Step 4.
+Steps 3–4 provide the approved French patient form, local submission, and private tracking. Step 5 adds local dentist login and a department-scoped, read-only dashboard. Step 2 Supabase files remain prepared but **not deployed**. Do not connect Supabase or supply database credentials. Request details, clinical evaluation, dentist responses, appointments, and notifications are not implemented. Development stops after Step 5.
 
 **This is a local development prototype. Use fictional patient data only. Do not deploy filesystem-backed storage as a production system.**
 
@@ -25,7 +26,7 @@ Step 4 adds local request submission, filesystem persistence, and private tracki
 
 ## Local installation
 
-Install Node.js 22 LTS or newer with npm. Confirm `node --version` and `npm --version` work in your terminal. If you use a Node version manager, activate your installed Node version first.
+Use Node.js 22.23.3 or newer with npm (tested with 22.23.3). Confirm `node --version` and `npm --version` work in your terminal. If you use a Node version manager, activate your installed Node version first.
 
 From the project directory:
 
@@ -33,7 +34,7 @@ From the project directory:
 npm ci
 ```
 
-No environment variables, credentials, or external services are required. Keep the deferred Supabase setup below unexecuted.
+No environment variables, database credentials, or external services are required. The patient flow needs no setup. Generate local dentist test credentials with `npm run dentists:seed` as described below. Keep the deferred Supabase setup unexecuted.
 
 ## Start development
 
@@ -52,7 +53,7 @@ npm test
 npm run build
 ```
 
-Type checking first generates Next.js route types, so it also works before the first build. Tests use Node's test runner and the existing TypeScript compiler; no test dependencies were added. They cover validation, independent request tokens, photo limits/signatures, complete JSON writes, and cleanup after an injected commit failure. Test storage is isolated under `.npm-cache/` and removed afterward.
+Type checking first generates Next.js route types, so it also works before the first build. Tests use Node's test runner and the existing TypeScript compiler; no test dependencies were added. They cover patient storage plus account generation, password verification, session expiration/revocation, department isolation, counts, and filters. Test storage is isolated under `.npm-cache/` and removed afterward.
 
 ## Run a production build locally
 
@@ -74,7 +75,9 @@ src/
     patient/page.tsx     French patient interface
     patient/track/[token]/
     api/requests/        Submission and token-protected read/photo routes
-    dentist/page.tsx     Dentist placeholder
+    dentist/page.tsx     Protected department dashboard
+    dentist/login/      Local login
+    api/dentist/         Login, logout, and protected request list
   components/
     brand.tsx            Homepage brand link
     portal-placeholder.tsx
@@ -87,6 +90,8 @@ src/
     validation.ts        Shared validation using existing question definitions
     storage.ts           Server-only local JSON/photo storage
     http.ts              Private responses and bounded multipart parsing
+  lib/dentist/           Password hashes, accounts/sessions, scoped dashboard
+  components/dentist/    French login form and dashboard
   lib/supabase/
     server.ts            Server-only, unprivileged Supabase client factory
 supabase/
@@ -95,10 +100,60 @@ supabase/
   verify.sql             SQL checks to run after applying the migration
 tests/
   local-requests.test.mjs
+  local-dentist.test.mjs
+scripts/
+  create-dentists.mjs     Generate six fictional accounts without overwriting
 .local-data/             Ignored local TEST data; created automatically
+  dentists.json          Local accounts; salted password hashes only
+  sessions/<hash>.json   Hashed session tokens and expiration
   requests/<uuid>.json
   photos/<request-uuid>/<photo-uuid>.<jpg|png|webp>
 ```
+
+## Step 5: Local dentist login and dashboard
+
+From the project directory:
+
+```sh
+npm run dentists:seed
+npm run dev -- --hostname 127.0.0.1
+```
+
+The account command creates **one fictional dentist for each of the six existing departments** in `.local-data/dentists.json`. It prints each email and randomly generated TEST password to your terminal **once**. Keep that output privately; plaintext passwords are not saved and cannot be recovered from hashes. No account or patient file is overwritten. Running the command again reports that the accounts already exist and leaves them unchanged. There is no public registration, password-reset page, or account-management API.
+
+Open [http://127.0.0.1:3000/dentist/login](http://127.0.0.1:3000/dentist/login) and enter a generated email and password. Visiting `/dentist` without a valid session redirects to login. After login, the dashboard displays the dentist's name, assigned department, four summary cards, and a read-only patient request table. The sidebar provides **Se déconnecter**. There are no request-detail links or editing controls.
+
+### Test two departments
+
+1. In the existing patient interface, submit a **fictional** request addressed to **Endodontie** and another to **Parodontologie**. Keep both private tracking links.
+2. Log in as the generated Endodontie account (`dentiste3@usj-teledent.test`) using its printed password. Confirm its name/service, the Endodontie request, and absence of Parodontologie patients.
+3. Test **Toutes**, **Nouvelles**, **En cours**, **Répondues**, and **Clôturées**, plus priorities **Toutes**, **Normale**, **Haute**, then **Appliquer**. Fresh patient submissions are all `nouveau` / `normal`, so other filters will normally show an empty state in Step 5.
+4. Log out, then log in as the Parodontologie account (`dentiste2@usj-teledent.test`). Confirm it sees its own service's requests only. Changing URL parameters such as `department=Endodontie` cannot change this access.
+5. Log out and reopen `/dentist`: it must redirect to login. Calling `GET /api/dentist/requests` without a session must return 401. The old session is invalid even if its old cookie is replayed.
+6. Open both patient tracking links and verify that Step 4 still works. Existing patient requests/photos are not changed or deleted by login, filtering, seeding, or logout.
+
+Dashboard counts always cover the **entire authenticated department**, independent of active table filters. **Demandes traitées** counts `repondu` plus `cloture`. Status filter keys are `all`, `nouveau`, `en_cours`, `repondu`, `cloture`; priority keys are `all`, `normal`, `high` (displayed as Haute). Unknown filters fall back to Toutes. These filters do not update or evaluate requests. The automated tests create isolated fictional status/priority fixtures to cover all cases without changing existing patient records.
+
+### Local authentication and privacy
+
+- Passwords use Node.js built-in scrypt with independent random salts (`N=131072`, `r=8`, `p=1`) and constant-time hash comparisons. No extra authentication dependency is installed.
+- Successful login issues a fresh random 256-bit session token in an **HTTP-only, SameSite=Strict** cookie. Cookies and server sessions expire after **8 hours**. Cookies use `Secure` for HTTPS (including a local TLS proxy reporting `X-Forwarded-Proto: https`). Keep the app bound to loopback; this prototype is not configured for untrusted proxies.
+- `.local-data/sessions/<sha256-token-hash>.json` stores the hash, dentist ID, creation and expiration dates, never the raw token. Sessions survive a server restart until they expire or are revoked. Logout deletes the session file and expires the cookie. Existing sessions are rotated on successful login. Expired files may remain on disk but are never accepted.
+- Every protected page/API request looks up the current dentist account server-side. Removing an account revokes its access; changing its assigned department takes effect on the next request. No browser-supplied dentist/department selection grants access.
+- Department filtering happens **before** an explicit projection of table fields. Dashboard responses exclude tracking tokens/hashes, password hashes, account lists, patient contact details, symptom answers, and photo paths. No-store, no-index, and no-referrer protections also cover dentist pages and endpoints.
+- Login and logout require a matching local Origin, or browser-confirmed same-origin Fetch Metadata when the no-referrer policy suppresses Origin on a native form POST. Cross-site requests are rejected. The login form holds only the credentials entered by the user, and JavaScript never receives session tokens in JSON or localStorage. Error messages do not reveal whether an email exists.
+
+| Dentist endpoint | Behavior |
+| --- | --- |
+| `POST /api/dentist/login` | Same-origin JSON `{ email, password }`; verifies credentials and sets the session cookie. |
+| `POST /api/dentist/logout` | Same-origin POST; revokes the session and redirects to login. |
+| `GET /api/dentist/requests?status=all&priority=all` | Authenticated, department-scoped dashboard rows/counts; 401 without a valid session. |
+
+The entire `.local-data/` directory is ignored by Git and must stay outside `public/`. Never commit terminal credentials or account/session data. To invalidate all demo sessions manually, stop the server, verify `.local-data/sessions` is the intended local directory, and remove **only** its session files. Do not remove requests/photos. If you intentionally regenerate accounts later, preserve any existing account file first; the seed command deliberately provides no silent overwrite option.
+
+**This authentication is for local fictional-data testing only. It is not production-ready.** It does not include internet-facing abuse protection or a production account lifecycle. Supabase and the remaining MVP steps are still postponed.
+
+References: [Node.js crypto](https://nodejs.org/api/crypto.html), [OWASP scrypt guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#scrypt), and [Next.js cookies](https://nextjs.org/docs/app/api-reference/functions/cookies).
 
 ## Step 4: Test submission and private tracking locally
 
@@ -137,20 +192,20 @@ Private pages, API responses, and photos use no-store caching, no-index headers,
 
 With the server stopped, inspect `.local-data/requests/<uuid>.json` in your editor. Photo metadata points to `.local-data/photos/<request-uuid>/<photo-uuid>.<extension>`. These paths are relative to the project root. Do not edit a record while the server is writing it. `.local-data/` is ignored by Git; access is controlled by the local operating-system account as well as the HTTP token checks.
 
-To clear **only fictional local test data**, first stop the server and verify the exact target from the project root in PowerShell:
+To clear **only fictional patient test data** while preserving dentist accounts and sessions, first stop the server and verify both exact targets from the project root in PowerShell:
 
 ```powershell
-Resolve-Path -LiteralPath .local-data
+Resolve-Path -LiteralPath .local-data/requests, .local-data/photos
 Get-ChildItem -LiteralPath .local-data/requests
 ```
 
-Confirm the resolved directory is `C:\joseph\ZAKA\codes\USJ-TeleDent\.local-data` and contains only test records. Then delete that directory:
+Confirm both resolved directories are inside `C:\joseph\ZAKA\codes\USJ-TeleDent\.local-data` and contain only fictional requests/photos. Then delete those two directories only:
 
 ```powershell
-Remove-Item -LiteralPath .local-data -Recurse -Force
+Remove-Item -LiteralPath .local-data/requests, .local-data/photos -Recurse -Force
 ```
 
-This permanently invalidates its tracking links and deletes its photos. Directories will be recreated on the next submission. Do not delete or move unrelated project directories.
+This permanently invalidates those tracking links and deletes those photos. The two directories will be recreated on the next submission. Dentist accounts and sessions remain intact. Do not delete or move unrelated project directories.
 
 The shared header, footer, skip link, and brand accessibility label are in French so the patient experience has no English shell text. No mockup assets were available in the repository or attached conversation; the implementation follows the specified navy, white, light blue, and clean-card direction.
 
