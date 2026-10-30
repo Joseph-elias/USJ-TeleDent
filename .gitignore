@@ -1,4 +1,5 @@
 node_modules/
+.local-data/
 .npm-cache/
 .next/
 out/

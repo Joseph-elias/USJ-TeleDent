@@ -4,13 +4,16 @@ A teledentistry website connecting patients with dental professionals.
 
 ## Project scope
 
-The application contains three responsive pages:
+The application includes:
 
 - `/` — USJ TeleDent homepage with Patient Portal and Dentist Portal links.
 - `/patient` — mobile-first French patient interface with a local multi-step form.
 - `/dentist` — desktop-first dentist placeholder.
+- `/patient/track/<private-token>` — private tracking page for a saved local request.
 
-Step 3 implements the French patient interface at `/patient`. The homepage and dentist placeholder remain functional. Step 2 Supabase files are prepared but **not deployed**. The MVP stays entirely local until the complete workflow works: do not connect Supabase or supply database credentials for this step. Request submission, persistence, tracking, authentication, and the dentist dashboard are not implemented.
+Step 4 adds local request submission, filesystem persistence, and private tracking to the approved French patient form. Step 2 Supabase files remain prepared but **not deployed**. Do not connect Supabase or supply database credentials. Dentist login, dashboard, clinical evaluation, responses, and notifications are not implemented. Development stops after Step 4.
+
+**This is a local development prototype. Use fictional patient data only. Do not deploy filesystem-backed storage as a production system.**
 
 ## Technology
 
@@ -18,6 +21,7 @@ Step 3 implements the French patient interface at `/patient`. The homepage and d
 - TypeScript
 - Tailwind CSS
 - npm
+- Node.js filesystem and local JSON/photo files (no database)
 
 ## Local installation
 
@@ -29,34 +33,35 @@ From the project directory:
 npm ci
 ```
 
-The existing pages run without environment variables or external services. Supabase configuration is described below.
+No environment variables, credentials, or external services are required. Keep the deferred Supabase setup below unexecuted.
 
 ## Start development
 
 ```sh
-npm run dev
+npm run dev -- --hostname 127.0.0.1
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The portal links open `/patient` and `/dentist`; each placeholder links back to the homepage.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000). Binding to loopback keeps this prototype on your machine. The portal links open `/patient` and `/dentist`.
 
 ## Validation
 
 ```sh
 npm run lint
 npm run typecheck
+npm test
 npm run build
 ```
 
-Type checking first generates Next.js route types, so it also works before the first build.
+Type checking first generates Next.js route types, so it also works before the first build. Tests use Node's test runner and the existing TypeScript compiler; no test dependencies were added. They cover validation, independent request tokens, photo limits/signatures, complete JSON writes, and cleanup after an injected commit failure. Test storage is isolated under `.npm-cache/` and removed afterward.
 
 ## Run a production build locally
 
 ```sh
 npm run build
-npm start
+npm start -- --hostname 127.0.0.1
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000). This command is for checking the build locally, not deploying it.
 
 ## Structure
 
@@ -67,33 +72,85 @@ src/
     layout.tsx           Shared header, footer, and metadata
     page.tsx             Homepage
     patient/page.tsx     French patient interface
+    patient/track/[token]/
+    api/requests/        Submission and token-protected read/photo routes
     dentist/page.tsx     Dentist placeholder
   components/
     brand.tsx            Homepage brand link
     portal-placeholder.tsx
   components/patient/
     patient-data.ts      Static departments, reasons, and question definitions
-    patient-flow.tsx     Browser-only multi-step patient form
+    patient-flow.tsx     Multi-step form and local submission
+    submission-confirmation.tsx
+  lib/requests/
+    types.ts             Request, photo, and tracking types
+    validation.ts        Shared validation using existing question definitions
+    storage.ts           Server-only local JSON/photo storage
+    http.ts              Private responses and bounded multipart parsing
   lib/supabase/
     server.ts            Server-only, unprivileged Supabase client factory
 supabase/
   config.toml            Local CLI configuration (not a hosted project link)
   migrations/            Step 2 schema, department seed, and private bucket
   verify.sql             SQL checks to run after applying the migration
+tests/
+  local-requests.test.mjs
+.local-data/             Ignored local TEST data; created automatically
+  requests/<uuid>.json
+  photos/<request-uuid>/<photo-uuid>.<jpg|png|webp>
 ```
 
-## Step 3: Test the local patient interface
+## Step 4: Test submission and private tracking locally
 
-Run `npm run dev` and open [http://localhost:3000/patient](http://localhost:3000/patient). No `.env.local`, Supabase project, or credentials are needed.
+Run `npm run dev -- --hostname 127.0.0.1` and open [http://127.0.0.1:3000/patient](http://127.0.0.1:3000/patient). No `.env.local`, Supabase project, or credentials are needed. Use only fictional values, for example **Patient Fictif**, dossier **TEST-LOCAL**, birth date **15/04/1990**, and phone **+961 70 123 456** (not for contacting anyone).
 
 1. Choose one of the four patient entry options.
 2. Try **Suivant** with empty identification fields: French validation errors should appear. Fill in the required fields; email is optional. A future birth date or invalid email/phone is rejected.
 3. Choose a contact reason, then answer its questions and add a description. Pain, swelling, bleeding, trauma, restoration/prosthesis, follow-up, consultation, and other problems each have relevant questions. Answers start empty; use **Je ne sais pas** for uncertainty. Switching reason preserves separate answers for each reason; the summary shows only the active reason's answers.
-4. Optionally attach up to three JPEG, PNG, or WebP photos (maximum 5 MiB / 5,242,880 bytes each). Check previews and removal; try a fourth image, an oversized file, and an unsupported format. Photos are never uploaded.
+4. Optionally attach up to three fictional JPEG, PNG, or WebP photos (maximum 5 MiB / 5,242,880 bytes each). Check previews and removal; try a fourth image, an oversized file, and an unsupported format. On submission the server also validates the count, size, declared MIME, and file signature. Multipart requests are capped at 16 MiB.
 5. Choose one of the six departments, then review the summary. Use **Précédent** to edit information; values and photos remain available while navigating.
-6. Click **Envoyer ma demande**: a French message confirms that nothing was sent or saved and that this feature will be available in Step 4. This is not a successful submission.
-7. Resize between mobile and desktop widths and test keyboard navigation. The warning about immediate emergency care remains visible throughout. No diagnosis or automatic clinical decision is made.
-8. Reload the page: all entries and photos disappear. There is no localStorage, sessionStorage, file, API, or database persistence.
+6. Click **Envoyer ma demande**. The button shows a loading state and prevents repeated clicks. On success, **Votre demande a été enregistrée** appears with the unique reference and status **Nouveau**. No notification to a dentist is claimed or sent.
+7. Copy the private link using **Copier le lien privé**, then open **Voir ma demande**. If clipboard access is unavailable, the link is selected for manual copying. Keep this link: there is no lookup by name, file number, or public reference, and the raw token is not recoverable from the saved JSON.
+8. Verify the reference, submission date (Beyrouth time), reason, department, and status. Photos are displayed through a protected endpoint. Dentist response/appointment/call fields display only when available; no editing or response workflow exists yet.
+9. Refresh the tracking page, stop the server with Ctrl+C, restart it from the same project directory, and reopen the saved link. The request and photos persist. An invalid token must return a generic not-found response; a token for a different request must not expose its photos.
+10. Submit a second fictional request, this time with/without photos. Inspect both JSON records and the photo files as described below. Check `/` and `/dentist` still work. Resize between mobile and desktop widths.
+
+Before submission, the unfinished form exists only in React state and is lost on reload. After submission, records live on the server filesystem; neither localStorage nor sessionStorage is used. If saving cannot be confirmed, the form retains its values and displays a French error. A lost HTTP response can leave an already-saved request without its confirmation; this simple local prototype has no retry deduplication or link recovery.
+
+### Storage and private access
+
+The server-only adapter in `src/lib/requests/storage.ts` automatically creates `.local-data/requests/` and `.local-data/photos/`. Each request is a complete JSON file named by UUID, using the Step 2 field names, a local `department` label, and photo metadata. New requests always use `status = nouveau`, `priority = normal`, and null dentist decision/response/appointment/call fields. Server validation never accepts client overrides for these values.
+
+Photo paths contain random UUIDs, never patient-supplied filenames. Nothing is stored under `public/`. The server writes and flushes photos and a temporary JSON file, then atomically renames the JSON file in the same directory. Readers see only committed `.json` records. Handled write/commit failures remove temporary JSON and associated photos. This is a single-machine development adapter, not a production database or crash-recovery system.
+
+Each submission generates a cryptographically random 256-bit token. Only its SHA-256 hash is saved. Reads compare token hashes and scan local UUID JSON files; no separate index is needed for this prototype. The private read API returns only the tracking fields and photo IDs, not identity/contact fields, the token hash, or storage paths.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /api/requests` | Multipart field `data` containing the JSON form payload; zero to three `photos` files. Returns reference, status, and private tracking path on success. |
+| `GET /api/requests/track/<token>` | Token-protected tracking information. Invalid tokens receive the same generic 404. |
+| `GET /api/requests/track/<token>/photos/<photo-id>` | Photo bytes only when both token and photo ownership match. |
+
+Private pages, API responses, and photos use no-store caching, no-index headers, and a no-referrer policy. The page also declares robots/referrer metadata. Protected images bypass Next Image optimization. Development request/browser-to-terminal logs are disabled to avoid printing capability URLs. Anyone holding a private link can access that request's tracking and photos: keep it private. Browser history and the copied link remain under your control.
+
+### Inspect or clear local TEST data
+
+With the server stopped, inspect `.local-data/requests/<uuid>.json` in your editor. Photo metadata points to `.local-data/photos/<request-uuid>/<photo-uuid>.<extension>`. These paths are relative to the project root. Do not edit a record while the server is writing it. `.local-data/` is ignored by Git; access is controlled by the local operating-system account as well as the HTTP token checks.
+
+To clear **only fictional local test data**, first stop the server and verify the exact target from the project root in PowerShell:
+
+```powershell
+Resolve-Path -LiteralPath .local-data
+Get-ChildItem -LiteralPath .local-data/requests
+```
+
+Confirm the resolved directory is `C:\joseph\ZAKA\codes\USJ-TeleDent\.local-data` and contains only test records. Then delete that directory:
+
+```powershell
+Remove-Item -LiteralPath .local-data -Recurse -Force
+```
+
+This permanently invalidates its tracking links and deletes its photos. Directories will be recreated on the next submission. Do not delete or move unrelated project directories.
 
 The shared header, footer, skip link, and brand accessibility label are in French so the patient experience has no English shell text. No mockup assets were available in the repository or attached conversation; the implementation follows the specified navy, white, light blue, and clean-card direction.
 

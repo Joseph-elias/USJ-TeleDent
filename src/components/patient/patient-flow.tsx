@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { departments, emptyIdentity, identityFields, purposes, reasons, steps, type Identity } from "./patient-data";
+import { RequestValidationError, validateRequest } from "@/lib/requests/validation";
+import type { SubmissionResult } from "@/lib/requests/types";
+import { SubmissionConfirmation } from "./submission-confirmation";
 
 type Photo = { id: string; file: File; url: string };
 const control = "mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-navy focus:border-sky-600";
@@ -42,7 +45,10 @@ export function PatientFlow() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [photoError, setPhotoError] = useState("");
-  const [submissionNotice, setSubmissionNotice] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState("");
+  const [confirmation, setConfirmation] = useState<SubmissionResult | null>(null);
+  const submitting = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const errorSummary = useRef<HTMLDivElement>(null);
   const photoUrls = useRef(new Set<string>());
@@ -65,13 +71,13 @@ export function PatientFlow() {
 
   function moveTo(next: number) {
     setErrors({});
-    setSubmissionNotice(false);
+    setSubmissionError("");
     setStep(next);
   }
 
   function next(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (step >= steps.length) return;
+    if (step >= steps.length) { void submitRequest(); return; }
     const found: Record<string, string> = {};
     if (step === 1) {
       identityFields.forEach((field) => {
@@ -125,6 +131,49 @@ export function PatientFlow() {
     return errors[id] ? <p id={`${id}-error`} className="mt-2 text-sm text-red-700">{errors[id]}</p> : null;
   }
 
+  async function submitRequest() {
+    if (submitting.current) return;
+    setSubmissionError("");
+    let payload;
+    try {
+      payload = validateRequest({
+        patient_name: identity.name, patient_file_number: identity.fileNumber,
+        date_of_birth: identity.birthDate, phone: identity.phone, email: identity.email.trim(),
+        reason: reasonId, description, symptom_answers: answers, department,
+      });
+    } catch (error) {
+      setSubmissionError(error instanceof RequestValidationError ? error.message : "Vérifiez les informations de votre demande.");
+      return;
+    }
+    submitting.current = true;
+    setIsSubmitting(true);
+    try {
+      const form = new FormData();
+      form.set("data", JSON.stringify(payload));
+      photos.forEach((photo) => form.append("photos", photo.file));
+      const response = await fetch("/api/requests", { method: "POST", body: form, cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) {
+        setSubmissionError(typeof result.error === "string" ? result.error : "L’enregistrement n’a pas pu être confirmé.");
+        return;
+      }
+      setConfirmation(result as SubmissionResult);
+      photoUrls.current.forEach((url) => URL.revokeObjectURL(url));
+      photoUrls.current.clear();
+      setPhotos([]);
+      setIdentity(emptyIdentity);
+      setAnswersByReason({});
+      setDescription("");
+    } catch {
+      setSubmissionError("L’enregistrement n’a pas pu être confirmé. Vérifiez le serveur local avant de réessayer.");
+    } finally {
+      submitting.current = false;
+      setIsSubmitting(false);
+    }
+  }
+
+  if (confirmation) return <SubmissionConfirmation result={confirmation} />;
+
   return <div lang="fr" className="mx-auto w-full max-w-4xl px-5 py-8 sm:px-8 sm:py-12">
     <Link href="/" className="text-sm font-semibold text-navy underline underline-offset-4">← Accueil USJ TeleDent</Link>
     <div className="mb-7 mt-8">
@@ -133,7 +182,7 @@ export function PatientFlow() {
       <p className="mt-3 text-sm leading-6 text-slate-600">{step === 0 ? "Préparez votre demande pour le service dentaire concerné." : "Prenez le temps de compléter les informations ci-dessous."}</p>
     </div>
     <EmergencyNotice />
-    <p className="my-5 rounded-xl bg-light-blue px-4 py-3 text-sm leading-6 text-navy">Version locale : rien n’est envoyé ni enregistré. Vos informations et photos restent en mémoire dans cet onglet et sont perdues à son rechargement ou à sa fermeture.</p>
+    <p className="my-5 rounded-xl bg-light-blue px-4 py-3 text-sm leading-6 text-navy">Prototype local : utilisez uniquement des informations fictives. Avant l’envoi, les informations restent dans cet onglet. Après l’envoi, la demande et ses photos sont enregistrées sur le serveur local.</p>
 
     {step === 0 ? <div className="grid gap-4 sm:grid-cols-2">{purposes.map((item) => <button key={item.title} type="button" onClick={() => { setPurpose(item.title); if (!purpose) setReasonId(item.reason); moveTo(1); }} className="group flex min-h-40 gap-4 rounded-2xl border border-slate-200 bg-white p-6 text-left hover:border-sky-500 hover:bg-sky-50">
       <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-light-blue text-2xl text-navy">{item.symbol}</span>
@@ -174,7 +223,7 @@ export function PatientFlow() {
 
         {step === 4 && <div>
           <label htmlFor="photos" className="block text-base font-semibold">Ajouter des photos</label>
-          <p id="photos-help" className="mt-2 text-sm leading-6 text-slate-600">Jusqu’à 3 photos, 5 Mo maximum par photo. Formats : JPEG, PNG, WebP. Aucun transfert vers un serveur.</p>
+          <p id="photos-help" className="mt-2 text-sm leading-6 text-slate-600">Jusqu’à 3 photos, 5 Mo maximum par photo. Formats : JPEG, PNG, WebP. Les photos seront enregistrées localement lors de l’envoi de la demande.</p>
           <input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="photos-help" onChange={(event) => { addPhotos(event.target.files); event.target.value = ""; }} className={`${control} file:mr-3 file:rounded-lg file:border-0 file:bg-light-blue file:px-3 file:py-2 file:text-navy`} />
           {photoError && <p role="alert" className="mt-3 text-sm text-red-700">{photoError}</p>}
           <p aria-live="polite" className="mt-4 text-sm text-slate-600">{photos.length} / 3 photos sélectionnées</p>
@@ -195,14 +244,15 @@ export function PatientFlow() {
             <div><dt className="text-sm text-slate-500">Service sélectionné</dt><dd className="mt-1 text-sm font-semibold">{department}</dd></div>
           </dl></section>
           <section aria-labelledby="summary-photos" className="border-t border-slate-200 pt-6"><h2 id="summary-photos" className="text-lg font-semibold">Photos jointes</h2>{photos.length ? <PhotoGallery photos={photos} /> : <p className="mt-2 text-sm text-slate-500">Aucune photo jointe.</p>}</section>
-          <div className="rounded-xl bg-light-blue p-5 text-sm leading-6"><p id="submission-help">L’enregistrement et l’envoi seront disponibles à l’étape 4 du projet. Pour le moment, aucune demande ne peut être transmise.</p>
-            <button type="button" aria-describedby="submission-help" onClick={() => setSubmissionNotice(true)} className={`${primary} mt-4 w-full sm:w-auto`}>Envoyer ma demande</button>
-            {submissionNotice && <p role="status" className="mt-3 font-semibold">Envoi indisponible pour le moment : rien n’a été envoyé ni enregistré. Cette fonction sera disponible à l’étape 4.</p>}
+          <div className="rounded-xl bg-light-blue p-5 text-sm leading-6"><p id="submission-help">En envoyant cette demande, vous enregistrez les informations et les photos sur le serveur local de ce prototype. Utilisez uniquement des données fictives.</p>
+            <button type="submit" disabled={isSubmitting} aria-describedby="submission-help" className={`${primary} mt-4 w-full disabled:cursor-wait disabled:opacity-60 sm:w-auto`}>{isSubmitting ? "Enregistrement en cours…" : "Envoyer ma demande"}</button>
+            <p role="status" className="mt-3">{isSubmitting ? "Veuillez patienter pendant l’enregistrement de votre demande." : ""}</p>
+            {submissionError && <p role="alert" className="mt-3 font-semibold text-red-700">{submissionError}</p>}
           </div>
         </div>}
 
         <div className="mt-8 flex flex-wrap justify-between gap-3 border-t border-slate-200 pt-6">
-          <button type="button" onClick={() => moveTo(step - 1)} className={secondary}>{step === 1 ? "Retour à l’espace patient" : "Précédent"}</button>
+          <button type="button" disabled={isSubmitting} onClick={() => moveTo(step - 1)} className={`${secondary} disabled:opacity-60`}>{step === 1 ? "Retour à l’espace patient" : "Précédent"}</button>
           {step < 6 && <button type="submit" className={primary}>{step === 5 ? "Voir le récapitulatif" : "Suivant"}<span aria-hidden="true" className="ml-3">→</span></button>}
         </div>
       </form>
