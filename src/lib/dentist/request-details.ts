@@ -12,7 +12,7 @@ const photoExtensions: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
 };
 
-async function authorizedRecord(token: string | undefined, id: string) {
+export async function readDentistRequestRecord(token: string | undefined, id: string) {
   const dentist = await dentistForSession(token);
   if (!dentist) return { status: "unauthenticated" as const };
   if (!uuid.test(id)) return { status: "not_found" as const };
@@ -24,7 +24,7 @@ async function authorizedRecord(token: string | undefined, id: string) {
 }
 
 export async function loadDentistRequest(token: string | undefined, id: string) {
-  const result = await authorizedRecord(token, id);
+  const result = await readDentistRequestRecord(token, id);
   if (result.status !== "ok") return result;
   const { record, dentist } = result;
   const reason = reasons.find((item) => item.id === record.reason);
@@ -38,6 +38,9 @@ export async function loadDentistRequest(token: string | undefined, id: string) 
       created_at: record.created_at, department: record.department,
       reason_label: reason?.label ?? "Motif non renseigné",
       status: record.status, priority: record.priority, description: record.description,
+      dentist_decision: record.dentist_decision ?? null, dentist_response: record.dentist_response ?? null,
+      proposed_appointment_at: record.proposed_appointment_at ?? null, call_video_details: record.call_video_details ?? null,
+      updated_at: record.updated_at,
       symptoms: (reason?.questions ?? []).map((question) => {
         const value = record.symptom_answers?.[question.id];
         return { id: question.id, label: question.label, answer: typeof value === "string" && value.trim() ? value : null };
@@ -48,7 +51,7 @@ export async function loadDentistRequest(token: string | undefined, id: string) 
 }
 
 export async function loadDentistPhoto(token: string | undefined, id: string, photoId: string) {
-  const result = await authorizedRecord(token, id);
+  const result = await readDentistRequestRecord(token, id);
   if (result.status !== "ok") return result;
   if (!uuid.test(photoId)) return { status: "not_found" as const };
   const photo = result.record.photos.find((item) => item.id === photoId && item.request_id === id);

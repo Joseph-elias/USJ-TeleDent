@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTrackingRequest } from "@/lib/requests/storage";
 import { reasons } from "@/components/patient/patient-data";
+import { decisionLabels, statusLabels } from "@/lib/requests/evaluation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,13 +32,14 @@ export default async function TrackingPage({ params }: { params: Promise<{ token
         <div><dt className="text-slate-500">Date d’enregistrement (heure de Beyrouth)</dt><dd className="mt-1">{date(request.created_at)}</dd></div>
         <div><dt className="text-slate-500">Service sélectionné</dt><dd className="mt-1">{request.department}</dd></div>
         <div><dt className="text-slate-500">Motif de contact</dt><dd className="mt-1">{reasons.find((reason) => reason.id === request.reason)?.label ?? request.reason}</dd></div>
-        <div><dt className="text-slate-500">Statut actuel</dt><dd className="mt-2 inline-block rounded-full bg-light-blue px-4 py-2 font-semibold">{request.status === "nouveau" ? "Nouveau" : request.status}</dd></div>
+        <div><dt className="text-slate-500">Statut actuel</dt><dd className="mt-2 inline-block rounded-full bg-light-blue px-4 py-2 font-semibold">{statusLabels[request.status] ?? request.status}</dd></div>
       </dl>
       <div className="mt-7 border-t border-slate-200 pt-5">
         <h2 className="font-semibold">Réponse du dentiste</h2>
+        {request.dentist_decision && <p className="mt-3 text-sm font-semibold">Décision : {decisionLabels[request.dentist_decision] ?? "Non renseignée"}</p>}
         <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">{request.dentist_response || "Aucune réponse disponible pour le moment."}</p>
-        {request.proposed_appointment_at && <p className="mt-4 text-sm">Rendez-vous proposé : {date(request.proposed_appointment_at)}</p>}
-        {request.call_video_details && <p className="mt-4 whitespace-pre-wrap break-words text-sm">Appel / vidéo : {request.call_video_details}</p>}
+        {request.dentist_decision === "appointment" && request.proposed_appointment_at && <div className="mt-4 rounded-xl bg-light-blue p-4 text-sm leading-6"><p>Rendez-vous proposé (heure de Beyrouth) : {date(request.proposed_appointment_at)}</p><p className="mt-2">Cette proposition ne constitue pas une réservation automatique.</p></div>}
+        {(request.dentist_decision === "call" || request.dentist_decision === "video") && request.call_video_details && <div className="mt-4 text-sm leading-6"><p className="font-semibold">{request.dentist_decision === "video" ? "Instructions de téléconsultation vidéo" : "Instructions d’appel"}</p><p className="mt-2 whitespace-pre-wrap break-words">{request.call_video_details}</p></div>}
       </div>
       {request.photos.length > 0 && <section aria-label="Photos jointes" className="mt-7 border-t border-slate-200 pt-5">
         <h2 className="font-semibold">Photos jointes</h2>

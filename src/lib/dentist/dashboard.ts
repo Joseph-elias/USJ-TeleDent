@@ -32,7 +32,7 @@ export async function loadDashboard(token: string | undefined, status?: unknown,
   const counts = {
     total: requests.length,
     nouveaux: requests.filter((item) => item.status === "nouveau").length,
-    en_cours: requests.filter((item) => item.status === "en_cours").length,
+    en_cours: requests.filter((item) => item.status === "en_cours" || item.status === "rendez_vous_propose").length,
     traites: requests.filter((item) => item.status === "repondu" || item.status === "cloture").length,
   };
   const filters = dashboardFilters(status, priority);

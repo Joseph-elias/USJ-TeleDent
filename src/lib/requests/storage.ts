@@ -99,7 +99,8 @@ export async function getTrackingRequest(token: string): Promise<TrackingRequest
   return {
     request_reference: record.request_reference, created_at: record.created_at,
     department: record.department, reason: record.reason, status: record.status,
-    dentist_response: record.dentist_response, proposed_appointment_at: record.proposed_appointment_at,
+    dentist_decision: record.dentist_decision, dentist_response: record.dentist_response, proposed_appointment_at: record.proposed_appointment_at,
+    updated_at: record.updated_at,
     call_video_details: record.call_video_details, photos: record.photos.map(({ id }) => ({ id })),
   };
 }

@@ -7,7 +7,7 @@ import type { loadDashboard } from "@/lib/dentist/dashboard";
 type DashboardData = NonNullable<Awaited<ReturnType<typeof loadDashboard>>>;
 const date = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Beirut" });
 
-export function DentistDashboard({ data }: { data: DashboardData }) {
+export function DentistDashboard({ data, transferred = false }: { data: DashboardData; transferred?: boolean }) {
   const { dentist, counts, filters, requests } = data;
   const cards = [
     ["Total des demandes", counts.total], ["Nouvelles demandes", counts.nouveaux],
@@ -16,6 +16,7 @@ export function DentistDashboard({ data }: { data: DashboardData }) {
   return <DentistShell dentist={dentist}>
       <p className="eyebrow">{dentist.department}</p>
       <h1 className="mt-3 text-3xl font-semibold tracking-tight">Tableau de bord</h1>
+      {transferred && <p role="status" className="mt-5 rounded-xl bg-light-blue p-4 text-sm font-semibold leading-6">La demande a été réorientée. Elle est désormais accessible au service destinataire et n’apparaît plus dans votre service.</p>}
       <p className="mt-3 text-sm leading-6 text-slate-600">Bonjour {dentist.full_name}. Retrouvez les demandes adressées à votre service.</p>
 
       <section aria-label="Résumé des demandes de votre service" className="mt-8 grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -24,7 +25,7 @@ export function DentistDashboard({ data }: { data: DashboardData }) {
           <p className="mt-3 text-3xl font-semibold tabular-nums">{count}</p>
         </div>)}
       </section>
-      <p className="mt-3 text-xs leading-5 text-slate-500">Totaux de votre service, indépendants des filtres. Les demandes traitées regroupent les demandes répondues et clôturées.</p>
+      <p className="mt-3 text-xs leading-5 text-slate-500">Totaux de votre service, indépendants des filtres. Les demandes en cours incluent les rendez-vous proposés. Les demandes traitées regroupent les demandes répondues et clôturées.</p>
 
       <section aria-labelledby="requests-heading" className="mt-10">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -67,7 +68,7 @@ export function DentistDashboard({ data }: { data: DashboardData }) {
             </tr>)}</tbody>
           </table>
         </div>}
-        <p className="mt-5 text-xs leading-6 text-slate-500">Heure de Beyrouth. Sélectionnez une référence pour consulter le dossier en lecture seule.</p>
+        <p className="mt-5 text-xs leading-6 text-slate-500">Heure de Beyrouth. Sélectionnez une référence pour consulter le dossier et enregistrer une évaluation.</p>
       </section>
       <p className="mt-8 border-t border-slate-200 pt-5 text-xs text-slate-500">Prototype local — données fictives uniquement.</p>
   </DentistShell>;

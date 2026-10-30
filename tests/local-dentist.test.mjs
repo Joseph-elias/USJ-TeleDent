@@ -12,16 +12,20 @@ import * as passwords from "../src/lib/dentist/password.mjs";
 
 const workspace = process.cwd();
 const require = createRequire(import.meta.url);
-function load(relativePath) {
+function load(relativePath, filesystem = fs) {
   const output = ts.transpileModule(readFileSync(path.join(workspace, relativePath), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
   }).outputText;
   const loaded = { exports: {} };
   function resolve(id) {
     if (id === "server-only") return {};
+    if (id === "node:fs/promises") return filesystem;
     if (id === "./password.mjs") return passwords;
-    if (id === "./auth") return load("src/lib/dentist/auth.ts");
-    if (id === "./filters") return load("src/lib/dentist/filters.ts");
+    if (id === "./auth") return load("src/lib/dentist/auth.ts", filesystem);
+    if (id === "./filters") return load("src/lib/dentist/filters.ts", filesystem);
+    if (id === "./request-details") return load("src/lib/dentist/request-details.ts", filesystem);
+    if (id === "./validation") return load("src/lib/requests/validation.ts", filesystem);
+    if (id === "@/lib/requests/evaluation") return load("src/lib/requests/evaluation.ts", filesystem);
     if (id === "@/components/patient/patient-data") return load("src/components/patient/patient-data.ts");
     return require(id);
   }
@@ -206,7 +210,8 @@ test("request details use French question labels, preserve explicit answers, and
     assert.equal(result.request.symptoms.find(q => q.id === "breathing").answer, null);
     assert.equal(result.request.symptoms.find(q => q.id === "swallowing").answer, null);
     assert.deepEqual(result.request.photos, []);
-    for (const secret of ["SECRET_TRACKING_SENTINEL", "STEP7_SENTINEL", "password_hash", "token_hash", "storage_path"]) assert.equal(JSON.stringify(result).includes(secret), false);
+    assert.equal(result.request.dentist_response, "STEP7_SENTINEL");
+    for (const secret of ["SECRET_TRACKING_SENTINEL", "password_hash", "token_hash", "storage_path"]) assert.equal(JSON.stringify(result).includes(secret), false);
     assert.equal(await fs.readFile(filename, "utf8"), raw, "Details access never writes the record");
     await fs.writeFile(filename, JSON.stringify({ ...record, reason: "pain", symptom_answers: { intensity: "0" } }));
     assert.equal((await loadDentistRequest(session.token, id)).request.symptoms.find(q => q.id === "intensity").answer, "0");
@@ -255,5 +260,143 @@ test("details and photo authorization reject other departments, invalid IDs, and
     await auth.destroySession(endo.token);
     assert.equal((await loadDentistRequest(endo.token, id)).status, "unauthenticated");
     assert.equal((await loadDentistPhoto(endo.token, id, photoId)).status, "unauthenticated");
+  });
+});
+
+test("evaluation validation covers defaults, proposals, transfers and forbidden modifications", () => {
+  const { validateEvaluation } = load("src/lib/requests/evaluation.ts");
+  const current = { department: "Endodontie", proposed_appointment_at: null };
+  const base = { priority: "normal", dentist_decision: "advice", dentist_response: "Réponse fictive rédigée par le dentiste." };
+  assert.equal(validateEvaluation(base, current).status, "repondu");
+  for (const decision of ["call", "video"]) assert.equal(validateEvaluation({ ...base, dentist_decision: decision, call_video_details: "Instructions fictives" }, current).status, "en_cours");
+  const future = new Date(Date.now() + 86400000).toISOString();
+  assert.equal(validateEvaluation({ ...base, dentist_decision: "appointment", proposed_appointment_at: future }, current).status, "rendez_vous_propose");
+  assert.equal(validateEvaluation({ priority: "high", dentist_decision: "transfer", department: "Parodontologie" }, current).dentist_response, null);
+  assert.equal(validateEvaluation({ ...base, status: "cloture" }, current).status, "cloture");
+  for (const invalid of [
+    { priority: "urgent" }, { dentist_decision: "diagnosis" }, { status: "invalid" },
+    { dentist_response: " " }, { dentist_response: "x".repeat(4001) },
+    { department: "Parodontologie" }, { call_video_details: "Incompatible instructions" },
+    { proposed_appointment_at: future }, { patient_name: "Forbidden" }, { tracking_token_hash: "Forbidden" },
+    { id: "Forbidden" }, { photos: [] }, { created_at: future }, { updated_at: future },
+    { dentist_decision: "appointment", proposed_appointment_at: null },
+    { dentist_decision: "appointment", proposed_appointment_at: "2099-02-30T10:00:00Z" },
+    { dentist_decision: "appointment", proposed_appointment_at: "2000-01-01T10:00:00Z" },
+    { dentist_decision: "transfer", department: "Endodontie" },
+    { dentist_decision: "transfer", department: "Invalid" },
+    { dentist_decision: "transfer", department: "Parodontologie", status: "repondu" },
+  ]) assert.throws(() => validateEvaluation({ ...base, ...invalid }, current));
+  const past = "2000-01-01T10:00:00.000Z";
+  assert.equal(validateEvaluation({ ...base, dentist_decision: "appointment", proposed_appointment_at: past, status: "cloture" }, { ...current, proposed_appointment_at: past }).status, "cloture");
+});
+
+async function evaluationFixture() {
+  const data = await accounts();
+  const auth = load("src/lib/dentist/auth.ts");
+  const endo = await auth.createSession(data[0].id), paro = await auth.createSession(data[1].id);
+  const id = randomUUID(), photoId = randomUUID();
+  const token = "B".repeat(43);
+  const record = {
+    id, request_reference: `TEST-EVALUATION-${id}`, patient_name: "Patient Évaluation Fictif",
+    patient_file_number: "TEST-EVALUATION", date_of_birth: "1990-04-15", phone: "+961 70 123 456", email: null,
+    reason: "pain", description: "Description fictive originale.", symptom_answers: { onset: "Hier", intensity: "0", pattern: "Intermittente", swelling: "Je ne sais pas" },
+    department: "Endodontie", status: "nouveau", priority: "normal", dentist_decision: null, dentist_response: null,
+    proposed_appointment_at: null, call_video_details: null, created_at: "2026-10-30T08:00:00Z", updated_at: "2026-10-30T08:00:00Z",
+    tracking_token_hash: createHash("sha256").update(token).digest("hex"),
+    photos: [{ id: photoId, request_id: id, storage_path: `${id}/${photoId}.png`, content_type: "image/png", size: 20, created_at: "2026-10-30T08:00:00Z" }],
+  };
+  await fs.mkdir(`.local-data/photos/${id}`, { recursive: true });
+  await fs.mkdir(".local-data/requests");
+  await fs.writeFile(`.local-data/requests/${id}.json`, JSON.stringify(record));
+  await fs.writeFile(`.local-data/photos/${id}/${photoId}.png`, "FICTITIOUS PHOTO");
+  return { record, endo, paro, token, id, photoId };
+}
+
+test("evaluations persist all decisions, retain protected data, and transfer access with the tracking link intact", async () => {
+  await isolated(async () => {
+    const { record, endo, paro, token, id, photoId } = await evaluationFixture();
+    const { updateDentistEvaluation } = load("src/lib/dentist/evaluation-storage.ts");
+    const { loadDentistRequest, loadDentistPhoto } = load("src/lib/dentist/request-details.ts");
+    const { getTrackingRequest, getTrackingPhoto } = load("src/lib/requests/storage.ts");
+    const { loadDashboard } = load("src/lib/dentist/dashboard.ts");
+    const read = async () => JSON.parse(await fs.readFile(`.local-data/requests/${id}.json`, "utf8"));
+    const base = { priority: "high", dentist_decision: "advice", dentist_response: "Conseils entièrement fictifs." };
+    assert.equal((await updateDentistEvaluation(undefined, id, base)).status, "unauthenticated");
+    assert.equal((await updateDentistEvaluation(paro.token, id, base)).status, "not_found");
+    assert.equal((await updateDentistEvaluation(endo.token, "../dentists", base)).status, "not_found");
+    const advice = await updateDentistEvaluation(endo.token, id, base);
+    assert.equal(advice.status, "ok"); assert.equal(advice.evaluation.status, "repondu");
+    assert.equal((await getTrackingRequest(token)).dentist_response, base.dentist_response);
+    const future = new Date(Date.now() + 86400000).toISOString();
+    await updateDentistEvaluation(endo.token, id, { ...base, dentist_decision: "appointment", proposed_appointment_at: future });
+    assert.equal((await getTrackingRequest(token)).proposed_appointment_at, future);
+    assert.equal((await loadDashboard(endo.token, "rendez_vous_propose")).requests.length, 1);
+    assert.equal((await loadDashboard(endo.token)).counts.en_cours, 1);
+    for (const decision of ["call", "video"]) {
+      await updateDentistEvaluation(endo.token, id, { ...base, dentist_decision: decision, call_video_details: "Instructions fictives." });
+      const tracked = await getTrackingRequest(token);
+      assert.equal(tracked.status, "en_cours"); assert.equal(tracked.call_video_details, "Instructions fictives.");
+      assert.equal(tracked.proposed_appointment_at, null);
+    }
+    const moved = await updateDentistEvaluation(endo.token, id, { priority: "high", dentist_decision: "transfer", department: "Parodontologie", dentist_response: "Note de réorientation fictive." });
+    assert.equal(moved.transferred, true); assert.equal(moved.evaluation.status, "nouveau");
+    assert.equal((await loadDentistRequest(endo.token, id)).status, "not_found");
+    assert.equal((await loadDentistPhoto(endo.token, id, photoId)).status, "not_found");
+    assert.equal((await updateDentistEvaluation(endo.token, id, base)).status, "not_found");
+    assert.equal((await loadDentistRequest(paro.token, id)).status, "ok");
+    assert.equal((await loadDentistPhoto(paro.token, id, photoId)).status, "ok");
+    assert.equal((await loadDashboard(endo.token)).counts.total, 0);
+    assert.equal((await loadDashboard(paro.token)).counts.total, 1);
+    assert.equal((await getTrackingRequest(token)).department, "Parodontologie");
+    assert.ok(await getTrackingPhoto(token, photoId));
+    await updateDentistEvaluation(paro.token, id, { ...base, status: "cloture" });
+    assert.equal((await getTrackingRequest(token)).status, "cloture");
+    const saved = await read();
+    for (const key of ["id", "request_reference", "patient_name", "patient_file_number", "date_of_birth", "phone", "email", "reason", "description", "symptom_answers", "created_at", "photos", "tracking_token_hash"]) assert.deepEqual(saved[key], record[key], key);
+    assert.notEqual(saved.updated_at, record.updated_at);
+    assert.deepEqual((await fs.readdir(".local-data/requests")), [`${id}.json`]);
+  });
+});
+
+test("failed evaluation replacement preserves the original JSON and removes temporary files/locks", async () => {
+  await isolated(async () => {
+    const { id, endo } = await evaluationFixture();
+    const filename = `.local-data/requests/${id}.json`;
+    const before = await fs.readFile(filename, "utf8");
+    const { updateDentistEvaluation } = load("src/lib/dentist/evaluation-storage.ts", {
+      ...fs, rename: async () => { throw new Error("simulated evaluation commit failure"); },
+    });
+    await assert.rejects(updateDentistEvaluation(endo.token, id, { priority: "normal", dentist_decision: "advice", dentist_response: "Fictif" }), /simulated/);
+    assert.equal(await fs.readFile(filename, "utf8"), before);
+    assert.deepEqual(await fs.readdir(".local-data/requests"), [`${id}.json`]);
+  });
+});
+
+test("exclusive evaluation writes recheck ownership after a concurrent transfer", async () => {
+  await isolated(async () => {
+    const { id, endo } = await evaluationFixture();
+    const { updateDentistEvaluation } = load("src/lib/dentist/evaluation-storage.ts");
+    const lock = await fs.open(`.local-data/requests/.${id}.lock`, "wx");
+    assert.equal((await updateDentistEvaluation(endo.token, id, { priority: "normal", dentist_decision: "advice", dentist_response: "Fictif" })).status, "busy");
+    await lock.close(); await fs.rm(`.local-data/requests/.${id}.lock`);
+    let ready, release;
+    const reachedLock = new Promise(resolve => { ready = resolve; });
+    const resume = new Promise(resolve => { release = resolve; });
+    const staleWriter = load("src/lib/dentist/evaluation-storage.ts", {
+      ...fs, open: async (...args) => {
+        if (String(args[0]).endsWith(".lock")) { ready(); await resume; }
+        return fs.open(...args);
+      },
+    });
+    const pending = staleWriter.updateDentistEvaluation(endo.token, id, { priority: "high", dentist_decision: "advice", dentist_response: "Fictif" });
+    await reachedLock;
+    const moved = await updateDentistEvaluation(endo.token, id, { priority: "normal", dentist_decision: "transfer", department: "Parodontologie" });
+    assert.equal(moved.status, "ok");
+    release();
+    assert.equal((await pending).status, "not_found");
+    const saved = JSON.parse(await fs.readFile(`.local-data/requests/${id}.json`, "utf8"));
+    assert.equal(saved.department, "Parodontologie");
+    assert.equal(saved.status, "nouveau");
+    assert.deepEqual(await fs.readdir(".local-data/requests"), [`${id}.json`]);
   });
 });

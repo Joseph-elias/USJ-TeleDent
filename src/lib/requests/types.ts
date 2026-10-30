@@ -37,7 +37,7 @@ export type SavedRequest = RequestInput & {
 // Only the fields needed for patient tracking leave the storage module.
 export type TrackingRequest = Pick<SavedRequest,
   "request_reference" | "created_at" | "department" | "reason" | "status" |
-  "dentist_response" | "proposed_appointment_at" | "call_video_details"
+  "dentist_decision" | "dentist_response" | "proposed_appointment_at" | "call_video_details" | "updated_at"
 > & { photos: { id: string }[] };
 
 export type SubmissionResult = {

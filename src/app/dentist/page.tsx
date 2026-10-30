@@ -8,9 +8,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Tableau de bord dentiste", robots: { index: false, follow: false }, referrer: "no-referrer" };
 
-export default async function DentistPage({ searchParams }: { searchParams: Promise<{ status?: string; priority?: string }> }) {
+export default async function DentistPage({ searchParams }: { searchParams: Promise<{ status?: string; priority?: string; transferred?: string }> }) {
   const filters = await searchParams;
   const data = await loadDashboard(await currentDentistToken(), filters.status, filters.priority);
   if (!data) redirect("/dentist/login");
-  return <DentistDashboard data={data} />;
+  return <DentistDashboard data={data} transferred={filters.transferred === "1"} />;
 }

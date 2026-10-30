@@ -3,14 +3,13 @@ export const statusFilters = [
   { value: "nouveau", label: "Nouvelles" },
   { value: "en_cours", label: "En cours" },
   { value: "repondu", label: "Répondues" },
+  { value: "rendez_vous_propose", label: "Rendez-vous proposé" },
   { value: "cloture", label: "Clôturées" },
 ] as const;
 export const priorityFilters = [
   { value: "all", label: "Toutes" }, { value: "normal", label: "Normale" }, { value: "high", label: "Haute" },
 ] as const;
-export const statusLabels: Record<string, string> = {
-  nouveau: "Nouveau", en_cours: "En cours", repondu: "Répondu", cloture: "Clôturé",
-};
+export { statusLabels } from "@/lib/requests/evaluation";
 
 export function dashboardFilters(status: unknown, priority: unknown) {
   return {

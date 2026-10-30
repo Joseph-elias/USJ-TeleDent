@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DentistShell } from "@/components/dentist/shell";
 import { DentistPhotoGallery } from "@/components/dentist/photo-gallery";
+import { DentistEvaluationForm } from "@/components/dentist/evaluation-form";
 import { loadDentistRequest } from "@/lib/dentist/request-details";
 import { currentDentistToken } from "@/lib/dentist/session";
 import { statusLabels } from "@/lib/dentist/filters";
@@ -28,7 +29,7 @@ export default async function DentistRequestPage({ params }: { params: Promise<{
     <p className="eyebrow mt-7">{request.department}</p>
     <h1 className="mt-3 text-3xl font-semibold tracking-tight">Détail de la demande</h1>
     <p className="mt-3 break-all text-sm font-semibold text-slate-600">{request.request_reference}</p>
-    <p className="mt-5 rounded-xl bg-light-blue p-4 text-sm leading-6">Consultation en lecture seule. Aucune modification de la demande n’est disponible à cette étape.</p>
+    <p className="mt-5 rounded-xl bg-light-blue p-4 text-sm leading-6">Consultez les informations et les photos, puis complétez l’évaluation ci-dessous. Les informations fournies par le patient restent inchangées.</p>
 
     <section aria-labelledby="patient-information" className={card}>
       <h2 id="patient-information" className="text-xl font-semibold">Informations patient</h2>
@@ -62,6 +63,15 @@ export default async function DentistRequestPage({ params }: { params: Promise<{
     <section aria-labelledby="attached-photos" className={card}>
       <h2 id="attached-photos" className="text-xl font-semibold">Photos jointes</h2>
       <DentistPhotoGallery requestId={request.id} photos={request.photos} />
+    </section>
+    <section aria-labelledby="dentist-evaluation" className={card}>
+      <h2 id="dentist-evaluation" className="text-xl font-semibold">Évaluation du dentiste</h2>
+      <DentistEvaluationForm requestId={request.id} initial={{
+        priority: request.priority, status: request.status, department: request.department,
+        dentist_decision: request.dentist_decision, dentist_response: request.dentist_response,
+        proposed_appointment_at: request.proposed_appointment_at, call_video_details: request.call_video_details,
+        updated_at: request.updated_at,
+      }} />
     </section>
     <p className="mt-6 text-xs leading-6 text-slate-500">Données confidentielles du service · Prototype local, données fictives uniquement.</p>
   </DentistShell>;

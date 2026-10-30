@@ -10,10 +10,10 @@ The application includes:
 - `/patient` — mobile-first French patient interface with a local multi-step form.
 - `/dentist/login` — French local dentist login.
 - `/dentist` — protected dentist dashboard, scoped to the account's department.
-- `/dentist/requests/<id>` — protected, read-only clinical request details and photo gallery.
+- `/dentist/requests/<id>` — protected clinical details, private photos, and manual dentist evaluation.
 - `/patient/track/<private-token>` — private tracking page for a saved local request.
 
-Steps 3–4 provide the approved French patient form, local submission, and private tracking. Step 5 adds local dentist login and a department-scoped dashboard. Step 6 adds read-only request details and private photo enlargement. Step 2 Supabase files remain prepared but **not deployed**. Do not connect Supabase or supply database credentials. Clinical decisions, request changes, dentist responses, appointments, and notifications are not implemented. Development stops after Step 6.
+Steps 3–6 provide patient submission/tracking, local dentist login, a department dashboard, and private clinical details/photos. Step 7 adds manual evaluation, patient responses, call/video instructions, appointment proposals, and department transfers. Step 2 Supabase files remain prepared but **not deployed**. Do not connect Supabase or supply database credentials. There is no automatic diagnosis, real call/video service, appointment booking, notification, or deployment. Development stops after Step 7; Step 8 has not started.
 
 **This is a local development prototype. Use fictional patient data only. Do not deploy filesystem-backed storage as a production system.**
 
@@ -54,7 +54,7 @@ npm test
 npm run build
 ```
 
-Type checking first generates Next.js route types, so it also works before the first build. Tests use Node's test runner and the existing TypeScript compiler; no test dependencies were added. They cover patient storage, authentication, dashboard filters, request-detail projections, French question labels, missing answers, private photos, department isolation, invalid IDs, and unsafe photo metadata. Test storage is isolated under `.npm-cache/` and removed afterward.
+Type checking first generates Next.js route types, so it also works before the first build. Tests use Node's test runner and the existing TypeScript compiler; no test dependencies were added. They cover patient storage, authentication, dashboard filters, clinical details/photos, evaluation validation/defaults, immutable fields, atomic replacement failures, concurrent transfers, and preservation of tracking/photo access. Test storage is isolated under `.npm-cache/` and removed afterward.
 
 ## Run a production build locally
 
@@ -79,7 +79,7 @@ src/
     dentist/page.tsx     Protected department dashboard
     dentist/login/      Local login
     dentist/requests/[id]/
-    api/dentist/         Login, logout, request list, and private photo reads
+    api/dentist/         Login/logout, request list, evaluation PATCH, private photos
   components/
     brand.tsx            Homepage brand link
     portal-placeholder.tsx
@@ -92,8 +92,9 @@ src/
     validation.ts        Shared validation using existing question definitions
     storage.ts           Server-only local JSON/photo storage
     http.ts              Private responses and bounded multipart parsing
-  lib/dentist/           Authentication, scoped dashboard and request-details reader
-  components/dentist/    French login, shared shell, dashboard and photo gallery
+    evaluation.ts        Shared French labels, evaluation types and validation
+  lib/dentist/           Authentication, scoped readers and atomic evaluation writer
+  components/dentist/    Login, shell, dashboard, gallery and evaluation form
   lib/supabase/
     server.ts            Server-only, unprivileged Supabase client factory
 supabase/
@@ -123,18 +124,18 @@ npm run dev -- --hostname 127.0.0.1
 
 The account command creates **one fictional dentist for each of the six existing departments** in `.local-data/dentists.json`. It prints each email and randomly generated TEST password to your terminal **once**. Keep that output privately; plaintext passwords are not saved and cannot be recovered from hashes. No account or patient file is overwritten. Running the command again reports that the accounts already exist and leaves them unchanged. There is no public registration, password-reset page, or account-management API.
 
-Open [http://127.0.0.1:3000/dentist/login](http://127.0.0.1:3000/dentist/login) and enter a generated email and password. Visiting `/dentist` without a valid session redirects to login. After login, the dashboard displays the dentist's name, assigned department, four summary cards, and a read-only patient request table. Select a request reference to open its Step 6 details. The sidebar provides **Se déconnecter**. There are no editing controls.
+Open [http://127.0.0.1:3000/dentist/login](http://127.0.0.1:3000/dentist/login) and enter a generated email and password. Visiting `/dentist` without a valid session redirects to login. The dashboard displays the dentist's identity, department, summary cards, and request table. Select a reference to open clinical details and the Step 7 evaluation panel. The original patient information and photos remain read-only. The sidebar provides **Se déconnecter**.
 
 ### Test two departments
 
 1. In the existing patient interface, submit a **fictional** request addressed to **Endodontie** and another to **Parodontologie**. Keep both private tracking links.
 2. Log in as the generated Endodontie account (`dentiste3@usj-teledent.test`) using its printed password. Confirm its name/service, the Endodontie request, and absence of Parodontologie patients.
-3. Test **Toutes**, **Nouvelles**, **En cours**, **Répondues**, and **Clôturées**, plus priorities **Toutes**, **Normale**, **Haute**, then **Appliquer**. Fresh patient submissions are all `nouveau` / `normal`, so other filters will normally show an empty state in Step 5.
+3. Test **Toutes**, **Nouvelles**, **En cours**, **Répondues**, **Rendez-vous proposé**, and **Clôturées**, plus priorities **Toutes**, **Normale**, **Haute**, then **Appliquer**. Fresh submissions are `nouveau` / `normal`; evaluations update these fields.
 4. Log out, then log in as the Parodontologie account (`dentiste2@usj-teledent.test`). Confirm it sees its own service's requests only. Changing URL parameters such as `department=Endodontie` cannot change this access.
 5. Log out and reopen `/dentist`: it must redirect to login. Calling `GET /api/dentist/requests` without a session must return 401. The old session is invalid even if its old cookie is replayed.
 6. Open both patient tracking links and verify that Step 4 still works. Existing patient requests/photos are not changed or deleted by login, filtering, seeding, or logout.
 
-Dashboard counts always cover the **entire authenticated department**, independent of active table filters. **Demandes traitées** counts `repondu` plus `cloture`. Status filter keys are `all`, `nouveau`, `en_cours`, `repondu`, `cloture`; priority keys are `all`, `normal`, `high` (displayed as Haute). Unknown filters fall back to Toutes. These filters do not update or evaluate requests. The automated tests create isolated fictional status/priority fixtures to cover all cases without changing existing patient records.
+Dashboard counts cover the **entire authenticated department**, independent of table filters. **Demandes en cours** counts `en_cours` plus `rendez_vous_propose`; **Demandes traitées** counts `repondu` plus `cloture`. Status filters accept `all`, `nouveau`, `en_cours`, `repondu`, `rendez_vous_propose`, `cloture`; priorities accept `all`, `normal`, `high` (Haute). Unknown filters fall back to Toutes. The filters themselves never modify records.
 
 ### Local authentication and privacy
 
@@ -153,7 +154,7 @@ Dashboard counts always cover the **entire authenticated department**, independe
 
 The entire `.local-data/` directory is ignored by Git and must stay outside `public/`. Never commit terminal credentials or account/session data. To invalidate all demo sessions manually, stop the server, verify `.local-data/sessions` is the intended local directory, and remove **only** its session files. Do not remove requests/photos. If you intentionally regenerate accounts later, preserve any existing account file first; the seed command deliberately provides no silent overwrite option.
 
-**This authentication is for local fictional-data testing only. It is not production-ready.** It does not include internet-facing abuse protection or a production account lifecycle. Supabase and Steps 7–8 are still postponed.
+**This authentication is for local fictional-data testing only. It is not production-ready.** It does not include internet-facing abuse protection or a production account lifecycle. Supabase and Step 8 remain postponed.
 
 References: [Node.js crypto](https://nodejs.org/api/crypto.html), [OWASP scrypt guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#scrypt), and [Next.js cookies](https://nextjs.org/docs/app/api-reference/functions/cookies).
 
@@ -163,7 +164,7 @@ References: [Node.js crypto](https://nodejs.org/api/crypto.html), [OWASP scrypt 
 2. From `/dentist`, select an underlined **request reference**. The page `/dentist/requests/<uuid>` displays four sections: **Informations patient**, **Informations de la demande**, **Symptômes et réponses**, and **Photos jointes**.
 3. Check the patient's identity/contact fields, request metadata, description, and symptoms. Question labels come directly from `patient-data.ts`. Every question for the chosen reason is shown. **Oui**, **Non**, **Je ne sais pas**, and pain intensity **0** remain explicit answers. Missing/blank answers show **Non renseigné**, never an assumed Non. Optional email is shown only when provided.
 4. Select **Agrandir** on a photo preview. The native dialog enlarges it; **Fermer** or Escape closes it and restores keyboard focus. Photos remain protected in both preview and enlarged views. A request without photos shows **Aucune photo jointe à cette demande**.
-5. Use **Retour au tableau de bord** to return to the dashboard. Existing dashboard counts, filters, login, and logout remain available. This step never writes a request or changes its status/priority.
+5. Use **Retour au tableau de bord** to return. Reading clinical details and photos never changes a record. The separate Step 7 evaluation panel is the only place to save a dentist decision.
 
 ### Private access and department checks
 
@@ -181,7 +182,72 @@ Photos use **`GET /api/dentist/requests/<id>/photos/<photoId>`**, not public sta
 4. Log out. Opening a details page must redirect to `/dentist/login`; accessing a protected photo must return 401. Authenticated requests with invalid or nonexistent UUIDs must return a generic 404.
 5. Confirm the patient tracking links and original submission flow still work. The automated tests exercise missing answers and unsafe paths in isolated fictional fixtures; do not edit existing patient records to test those cases.
 
-There is no request mutation endpoint, clinical evaluation, diagnosis, decision, response, transfer, appointment, or video feature in Step 6. No new dependency or storage mechanism is added.
+The approved Step 6 information display and photo gallery are preserved. Step 7 adds the evaluation panel below them without allowing changes to the patient's original information or photos.
+
+## Step 7: Evaluate, respond, and transfer locally
+
+Start the application from this directory:
+
+```sh
+npm run dev -- --hostname 127.0.0.1
+```
+
+No database, external credentials, or services are needed. Use existing dentist accounts. If accounts have never been generated, run `npm run dentists:seed` once and keep the printed TEST passwords.
+
+### Complete patient-to-dentist workflow
+
+1. At `/patient`, submit a new **fictional** request (optionally with fictional photos), select **Endodontie**, and save its private tracking link.
+2. At `/dentist/login`, log in as the Endodontie dentist (`dentiste3@usj-teledent.test`) with the existing generated password. Open the request reference from the dashboard.
+3. Review the original information, symptoms, and private photos. Under **Évaluation du dentiste**, choose priority, decision, status, and your own fictional response. The application never generates clinical advice.
+4. Select **Enregistrer la décision**. A loading state prevents duplicate clicks, and errors preserve your form. On success, the saved decision, response, status, priority, and any proposal/instructions are displayed. Refresh the page to verify persistence.
+5. Open or refresh the patient's **existing private tracking link**. It displays the current department, French status/decision labels, response, and relevant appointment or call/video information. There are no email/SMS notifications; patients revisit this private link.
+
+| Decision | Fields and default status |
+| --- | --- |
+| Réponse à distance / Conseils (`advice`) | Required response; defaults to `repondu` (Répondu). |
+| Appel téléphonique (`call`) | Required response, optional manual instructions/time; defaults to `en_cours`. |
+| Téléconsultation vidéo (`video`) | Required response, optional instructions/link as text; defaults to `en_cours`. No conferencing integration. |
+| Rendez-vous au centre (`appointment`) | Required response and future date/time; defaults to `rendez_vous_propose`. It is a proposal, not a booking. |
+| Réorientation vers un autre département (`transfer`) | Required different department; optional patient-visible transfer note in the response field. Status is always `nouveau` in the new department. |
+
+For non-transfer decisions, the dentist may explicitly choose any supported status, including **Clôturé**. Requests are **never automatically closed**. Selecting a different decision proposes its default status; the form shows that choice before saving. The priority remains a manual selection (Normale / Haute).
+
+Appointment inputs use the local timezone of the dentist's device and are saved as UTC ISO timestamps. Saved proposals and patient tracking display **Beyrouth time**. A new appointment must be in the future; an unchanged previously proposed time may be retained when updating an existing evaluation/status. Changing the decision clears irrelevant appointment/call fields so obsolete proposals do not remain visible.
+
+### Transfer and department access
+
+Choose **Réorientation vers un autre département**, select a different one of the six existing departments, and optionally enter a note under **Réponse au patient / Note de réorientation**. This note is visible to the patient and receiving service, not an internal staff note.
+
+After saving, a confirmation appears on the original dentist's dashboard and the case disappears from that service. The original department can no longer read details/photos or update it. Log out and sign in as the receiving department (for example Parodontologie, `dentiste2@usj-teledent.test`) to see the same request and continue its evaluation. The request ID, reference, original submission, photo metadata, and tracking hash are preserved; the patient's original private link and photos remain valid.
+
+### Protected update endpoint and storage
+
+**`PATCH /api/dentist/requests/<id>`** accepts a JSON evaluation with:
+
+- Required `priority` (`normal` / `high`) and `dentist_decision` (`advice` / `call` / `video` / `appointment` / `transfer`).
+- `dentist_response`, required except for a transfer's optional note (maximum 4,000 characters).
+- Optional `status`; if omitted, the decision's default is applied. A transfer must use `nouveau`.
+- `proposed_appointment_at` as an ISO date/time with timezone, required only for appointments.
+- Optional `call_video_details` for call/video decisions (maximum 2,000 characters).
+- `department` only for transfers, valid and different from the current department.
+
+All other payload fields are rejected, including client-supplied timestamps, identity, symptoms, photos, references, and tracking hashes. The endpoint enforces same-origin checks, current session validity, UUID validation, and department ownership. It returns 401 for missing/expired sessions, generic 404 for missing/unauthorized cases, 400 for invalid payloads, and 409 if a write is already active. Success returns only sanitized evaluation fields, not patient credentials, tokens, or filesystem paths.
+
+`src/lib/dentist/evaluation-storage.ts` updates the existing `.local-data/requests/<uuid>.json`. It takes an exclusive per-request `.lock`, rereads authorization and the latest record, validates the complete evaluation, writes and flushes a temporary `.tmp` file, then atomically replaces the JSON in the same directory. Only evaluation fields, department on transfer, and server-controlled `updated_at` change. Normal success/failure removes temporary files and the lock. There is no second database, history table, or duplicate request JSON.
+
+If a process is terminated abruptly during a save, a stale `.lock`/`.tmp` may remain. Stop all local server processes, inspect the exact files under this project's `.local-data/requests/`, and remove only the stale temporary/lock files for that request before retrying. Never delete the UUID `.json` or photos for this recovery. Do not remove locks while a server write is running. This simple prototype is not a production crash-recovery system.
+
+### Verify Step 7 with fictional records
+
+- **Advice:** save a fictional response; confirm Répondu and the exact response on tracking.
+- **Appointment:** use a new request and a future proposal; confirm Rendez-vous proposé and the formatted time on tracking.
+- **Call/video:** save each manual instruction variant and verify its patient display.
+- **Transfer:** move Endodontie to Parodontologie; verify dashboard membership, denial of the old department's detail/photo/update access, and access by the receiving department. Reuse the same patient tracking link.
+- **Security:** verify rejected unauthenticated/cross-department/cross-origin updates, invalid IDs/status/decision/department, and forbidden patient/photo/tracking-field modifications. Automated tests exercise these without editing existing patient records.
+- **Persistence:** refresh the dentist and tracking pages, stop/restart the development server from the same checkout, and verify responses/proposals/department remain saved.
+- **Regression:** verify patient form submission/photo upload, private tracking/photos, dentist login/logout, dashboard filters/counts, clinical details, and photo enlargement.
+
+Use fictional data only. No automatic diagnosis, real booking, phone/video integration, email/SMS notification, Supabase connection, deployment, or Step 8 work is included.
 
 ## Step 4: Test submission and private tracking locally
 
@@ -194,7 +260,7 @@ Run `npm run dev -- --hostname 127.0.0.1` and open [http://127.0.0.1:3000/patien
 5. Choose one of the six departments, then review the summary. Use **Précédent** to edit information; values and photos remain available while navigating.
 6. Click **Envoyer ma demande**. The button shows a loading state and prevents repeated clicks. On success, **Votre demande a été enregistrée** appears with the unique reference and status **Nouveau**. No notification to a dentist is claimed or sent.
 7. Copy the private link using **Copier le lien privé**, then open **Voir ma demande**. If clipboard access is unavailable, the link is selected for manual copying. Keep this link: there is no lookup by name, file number, or public reference, and the raw token is not recoverable from the saved JSON.
-8. Verify the reference, submission date (Beyrouth time), reason, department, and status. Photos are displayed through a protected endpoint. Dentist response/appointment/call fields display only when available; no editing or response workflow exists yet.
+8. Verify the reference, submission date (Beyrouth time), reason, department, and status. Photos are displayed through a protected endpoint. After a dentist saves a Step 7 evaluation, the same link displays its response and any relevant manual proposal/instructions.
 9. Refresh the tracking page, stop the server with Ctrl+C, restart it from the same project directory, and reopen the saved link. The request and photos persist. An invalid token must return a generic not-found response; a token for a different request must not expose its photos.
 10. Submit a second fictional request, this time with/without photos. Inspect both JSON records and the photo files as described below. Check `/` and `/dentist` still work. Resize between mobile and desktop widths.
 
