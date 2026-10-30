@@ -1,0 +1,35 @@
+# Local stack configuration; this is not a hosted project reference.
+# Generated with Supabase CLI 2.122.0, reduced to Step 2 requirements.
+project_id = "USJ-TeleDent"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+auto_expose_new_tables = false
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+# Required reference departments are seeded inside the versioned migration.
+[db.seed]
+enabled = false
+
+[storage]
+enabled = true
+
+# Keep the built-in auth.users table for the clinician profile foreign key.
+# No application login or signup flow is implemented.
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+enable_signup = false
+enable_anonymous_sign_ins = false
