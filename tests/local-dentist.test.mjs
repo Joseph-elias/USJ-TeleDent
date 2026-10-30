@@ -175,3 +175,85 @@ test("cookie options and login/logout origin checks", () => {
   assert.equal(isLocalOrigin(new Request("http://localhost/api/dentist/logout", { headers: { origin: "null", "sec-fetch-site": "same-origin" } })), true);
   assert.equal(isLocalOrigin(new Request("http://localhost/api/dentist/logout", { headers: { origin: "null", "sec-fetch-site": "cross-site" } })), false);
 });
+
+test("request details use French question labels, preserve explicit answers, and omit secrets", async () => {
+  await isolated(async () => {
+    const data = await accounts();
+    const auth = load("src/lib/dentist/auth.ts");
+    const { loadDentistRequest } = load("src/lib/dentist/request-details.ts");
+    const session = await auth.createSession(data[0].id);
+    const id = randomUUID();
+    await fs.mkdir(".local-data/requests");
+    const record = {
+      id, request_reference: "FICTIONAL-STEP6", patient_name: "Patient Détail Fictif",
+      patient_file_number: "TEST-STEP6", date_of_birth: "1990-04-15", phone: "+961 70 123 456",
+      email: "fictif@example.test", reason: "swelling", description: "Description fictive détaillée.",
+      symptom_answers: { onset: "Hier", increasing: "Oui", fever: "Non", opening: "Je ne sais pas" },
+      department: "Endodontie", status: "nouveau", priority: "normal", created_at: "2026-10-30T08:00:00Z",
+      tracking_token_hash: "SECRET_TRACKING_SENTINEL", dentist_response: "STEP7_SENTINEL", photos: [],
+    };
+    const filename = `.local-data/requests/${id}.json`;
+    const raw = JSON.stringify(record);
+    await fs.writeFile(filename, raw);
+    const result = await loadDentistRequest(session.token, id);
+    assert.equal(result.status, "ok");
+    assert.equal(result.request.patient_file_number, "TEST-STEP6");
+    assert.equal(result.request.reason_label, "Gonflement / Œdème");
+    assert.equal(result.request.symptoms.length, 6);
+    assert.deepEqual(result.request.symptoms.find(q => q.id === "fever"), { id: "fever", label: "Avez-vous de la fièvre ?", answer: "Non" });
+    assert.equal(result.request.symptoms.find(q => q.id === "increasing").answer, "Oui");
+    assert.equal(result.request.symptoms.find(q => q.id === "opening").answer, "Je ne sais pas");
+    assert.equal(result.request.symptoms.find(q => q.id === "breathing").answer, null);
+    assert.equal(result.request.symptoms.find(q => q.id === "swallowing").answer, null);
+    assert.deepEqual(result.request.photos, []);
+    for (const secret of ["SECRET_TRACKING_SENTINEL", "STEP7_SENTINEL", "password_hash", "token_hash", "storage_path"]) assert.equal(JSON.stringify(result).includes(secret), false);
+    assert.equal(await fs.readFile(filename, "utf8"), raw, "Details access never writes the record");
+    await fs.writeFile(filename, JSON.stringify({ ...record, reason: "pain", symptom_answers: { intensity: "0" } }));
+    assert.equal((await loadDentistRequest(session.token, id)).request.symptoms.find(q => q.id === "intensity").answer, "0");
+  });
+});
+
+test("details and photo authorization reject other departments, invalid IDs, and unsafe metadata", async () => {
+  await isolated(async () => {
+    const data = await accounts();
+    const auth = load("src/lib/dentist/auth.ts");
+    const { loadDentistRequest, loadDentistPhoto } = load("src/lib/dentist/request-details.ts");
+    const endo = await auth.createSession(data[0].id);
+    const paro = await auth.createSession(data[1].id);
+    const id = randomUUID();
+    const photoId = randomUUID();
+    await fs.mkdir(`.local-data/photos/${id}`, { recursive: true });
+    await fs.mkdir(".local-data/requests");
+    const bytes = Buffer.from("FICTIONAL PHOTO CONTENT");
+    const photo = { id: photoId, request_id: id, storage_path: `${id}/${photoId}.png`, content_type: "image/png", size: bytes.length };
+    const record = { id, department: "Endodontie", reason: "pain", symptom_answers: {}, photos: [photo] };
+    const filename = `.local-data/requests/${id}.json`;
+    const raw = JSON.stringify(record);
+    await fs.writeFile(filename, raw);
+    await fs.writeFile(`.local-data/photos/${id}/${photoId}.png`, bytes);
+    assert.equal((await loadDentistRequest(undefined, id)).status, "unauthenticated");
+    assert.equal((await loadDentistPhoto(undefined, id, photoId)).status, "unauthenticated");
+    assert.equal((await loadDentistRequest(paro.token, id)).status, "not_found");
+    assert.equal((await loadDentistPhoto(paro.token, id, photoId)).status, "not_found");
+    for (const invalid of ["../dentists", "%2e%2e", "not-a-uuid", randomUUID()]) {
+      assert.equal((await loadDentistRequest(endo.token, invalid)).status, "not_found");
+      assert.equal((await loadDentistPhoto(endo.token, invalid, photoId)).status, "not_found");
+      assert.equal((await loadDentistPhoto(endo.token, id, invalid)).status, "not_found");
+    }
+    const image = await loadDentistPhoto(endo.token, id, photoId);
+    assert.equal(image.status, "ok"); assert.deepEqual(image.bytes, bytes);
+    assert.equal(await fs.readFile(filename, "utf8"), raw);
+    await fs.writeFile(filename, JSON.stringify({ ...record, photos: [{ ...photo, storage_path: "../../dentists.json" }] }));
+    assert.equal((await loadDentistPhoto(endo.token, id, photoId)).status, "not_found");
+    await fs.writeFile(filename, JSON.stringify({ ...record, photos: [{ ...photo, request_id: randomUUID() }] }));
+    assert.equal((await loadDentistPhoto(endo.token, id, photoId)).status, "not_found");
+    await fs.writeFile(filename, JSON.stringify({ ...record, photos: [{ ...photo, content_type: "text/html" }] }));
+    assert.equal((await loadDentistPhoto(endo.token, id, photoId)).status, "not_found");
+    await fs.writeFile(filename, raw);
+    await fs.rm(`.local-data/photos/${id}/${photoId}.png`);
+    assert.equal((await loadDentistPhoto(endo.token, id, photoId)).status, "not_found");
+    await auth.destroySession(endo.token);
+    assert.equal((await loadDentistRequest(endo.token, id)).status, "unauthenticated");
+    assert.equal((await loadDentistPhoto(endo.token, id, photoId)).status, "unauthenticated");
+  });
+});

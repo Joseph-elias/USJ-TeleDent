@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Brand } from "@/components/brand";
+import { DentistShell } from "./shell";
 import { reasons } from "@/components/patient/patient-data";
 import { priorityFilters, statusFilters, statusLabels } from "@/lib/dentist/filters";
 import type { loadDashboard } from "@/lib/dentist/dashboard";
@@ -13,23 +13,7 @@ export function DentistDashboard({ data }: { data: DashboardData }) {
     ["Total des demandes", counts.total], ["Nouvelles demandes", counts.nouveaux],
     ["Demandes en cours", counts.en_cours], ["Demandes traitées", counts.traites],
   ] as const;
-  return <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col lg:flex-row">
-    <aside aria-label="Espace dentiste" className="flex shrink-0 flex-col bg-navy p-6 text-white lg:w-64 lg:py-9">
-      <div className="rounded-xl bg-white p-3"><Brand /></div>
-      <p className="mt-8 text-xs font-semibold uppercase tracking-widest text-sky-200">Espace dentiste</p>
-      <nav aria-label="Navigation dentiste" className="mt-4">
-        <Link href="/dentist" prefetch={false} aria-current="page" className="block rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold hover:bg-white/20">Tableau de bord</Link>
-      </nav>
-      <div className="mt-7 border-t border-white/20 pt-6 lg:mt-auto">
-        <p className="font-semibold">{dentist.full_name}</p>
-        <p className="mt-2 text-sm leading-6 text-sky-100">{dentist.department}</p>
-        <form method="post" action="/api/dentist/logout" className="mt-5">
-          <button type="submit" className="min-h-11 w-full rounded-xl border border-white/40 px-4 py-3 text-left text-sm font-semibold hover:bg-white/10">Se déconnecter</button>
-        </form>
-      </div>
-    </aside>
-
-    <div className="min-w-0 flex-1 bg-white px-5 py-8 sm:px-8 lg:py-10">
+  return <DentistShell dentist={dentist}>
       <p className="eyebrow">{dentist.department}</p>
       <h1 className="mt-3 text-3xl font-semibold tracking-tight">Tableau de bord</h1>
       <p className="mt-3 text-sm leading-6 text-slate-600">Bonjour {dentist.full_name}. Retrouvez les demandes adressées à votre service.</p>
@@ -73,7 +57,7 @@ export function DentistDashboard({ data }: { data: DashboardData }) {
               {["Référence", "Patient", "Motif de contact", "Service", "Date d’envoi", "Statut", "Priorité"].map((label) => <th key={label} scope="col" className="px-4 py-4 font-semibold">{label}</th>)}
             </tr></thead>
             <tbody className="divide-y divide-slate-100">{requests.map((request) => <tr key={request.id} className="align-top hover:bg-sky-50/50">
-              <td className="max-w-52 break-all px-4 py-5 text-xs font-semibold">{request.request_reference}</td>
+              <td className="max-w-52 break-all px-4 py-5 text-xs font-semibold"><Link href={`/dentist/requests/${request.id}`} prefetch={false} className="underline decoration-sky-300 underline-offset-4 hover:decoration-navy" aria-label={`Ouvrir la demande ${request.request_reference}`}>{request.request_reference}</Link></td>
               <td className="max-w-48 break-words px-4 py-5 font-medium">{request.patient_name}</td>
               <td className="max-w-56 px-4 py-5 text-slate-600">{reasons.find((reason) => reason.id === request.reason)?.label ?? request.reason}</td>
               <td className="px-4 py-5 text-slate-600">{request.department}</td>
@@ -83,9 +67,8 @@ export function DentistDashboard({ data }: { data: DashboardData }) {
             </tr>)}</tbody>
           </table>
         </div>}
-        <p className="mt-5 text-xs leading-6 text-slate-500">Heure de Beyrouth. Consultation de la liste uniquement : les dossiers et leur modification ne sont pas encore disponibles.</p>
+        <p className="mt-5 text-xs leading-6 text-slate-500">Heure de Beyrouth. Sélectionnez une référence pour consulter le dossier en lecture seule.</p>
       </section>
       <p className="mt-8 border-t border-slate-200 pt-5 text-xs text-slate-500">Prototype local — données fictives uniquement.</p>
-    </div>
-  </div>;
+  </DentistShell>;
 }

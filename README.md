@@ -10,9 +10,10 @@ The application includes:
 - `/patient` — mobile-first French patient interface with a local multi-step form.
 - `/dentist/login` — French local dentist login.
 - `/dentist` — protected dentist dashboard, scoped to the account's department.
+- `/dentist/requests/<id>` — protected, read-only clinical request details and photo gallery.
 - `/patient/track/<private-token>` — private tracking page for a saved local request.
 
-Steps 3–4 provide the approved French patient form, local submission, and private tracking. Step 5 adds local dentist login and a department-scoped, read-only dashboard. Step 2 Supabase files remain prepared but **not deployed**. Do not connect Supabase or supply database credentials. Request details, clinical evaluation, dentist responses, appointments, and notifications are not implemented. Development stops after Step 5.
+Steps 3–4 provide the approved French patient form, local submission, and private tracking. Step 5 adds local dentist login and a department-scoped dashboard. Step 6 adds read-only request details and private photo enlargement. Step 2 Supabase files remain prepared but **not deployed**. Do not connect Supabase or supply database credentials. Clinical decisions, request changes, dentist responses, appointments, and notifications are not implemented. Development stops after Step 6.
 
 **This is a local development prototype. Use fictional patient data only. Do not deploy filesystem-backed storage as a production system.**
 
@@ -53,7 +54,7 @@ npm test
 npm run build
 ```
 
-Type checking first generates Next.js route types, so it also works before the first build. Tests use Node's test runner and the existing TypeScript compiler; no test dependencies were added. They cover patient storage plus account generation, password verification, session expiration/revocation, department isolation, counts, and filters. Test storage is isolated under `.npm-cache/` and removed afterward.
+Type checking first generates Next.js route types, so it also works before the first build. Tests use Node's test runner and the existing TypeScript compiler; no test dependencies were added. They cover patient storage, authentication, dashboard filters, request-detail projections, French question labels, missing answers, private photos, department isolation, invalid IDs, and unsafe photo metadata. Test storage is isolated under `.npm-cache/` and removed afterward.
 
 ## Run a production build locally
 
@@ -77,7 +78,8 @@ src/
     api/requests/        Submission and token-protected read/photo routes
     dentist/page.tsx     Protected department dashboard
     dentist/login/      Local login
-    api/dentist/         Login, logout, and protected request list
+    dentist/requests/[id]/
+    api/dentist/         Login, logout, request list, and private photo reads
   components/
     brand.tsx            Homepage brand link
     portal-placeholder.tsx
@@ -90,8 +92,8 @@ src/
     validation.ts        Shared validation using existing question definitions
     storage.ts           Server-only local JSON/photo storage
     http.ts              Private responses and bounded multipart parsing
-  lib/dentist/           Password hashes, accounts/sessions, scoped dashboard
-  components/dentist/    French login form and dashboard
+  lib/dentist/           Authentication, scoped dashboard and request-details reader
+  components/dentist/    French login, shared shell, dashboard and photo gallery
   lib/supabase/
     server.ts            Server-only, unprivileged Supabase client factory
 supabase/
@@ -121,7 +123,7 @@ npm run dev -- --hostname 127.0.0.1
 
 The account command creates **one fictional dentist for each of the six existing departments** in `.local-data/dentists.json`. It prints each email and randomly generated TEST password to your terminal **once**. Keep that output privately; plaintext passwords are not saved and cannot be recovered from hashes. No account or patient file is overwritten. Running the command again reports that the accounts already exist and leaves them unchanged. There is no public registration, password-reset page, or account-management API.
 
-Open [http://127.0.0.1:3000/dentist/login](http://127.0.0.1:3000/dentist/login) and enter a generated email and password. Visiting `/dentist` without a valid session redirects to login. After login, the dashboard displays the dentist's name, assigned department, four summary cards, and a read-only patient request table. The sidebar provides **Se déconnecter**. There are no request-detail links or editing controls.
+Open [http://127.0.0.1:3000/dentist/login](http://127.0.0.1:3000/dentist/login) and enter a generated email and password. Visiting `/dentist` without a valid session redirects to login. After login, the dashboard displays the dentist's name, assigned department, four summary cards, and a read-only patient request table. Select a request reference to open its Step 6 details. The sidebar provides **Se déconnecter**. There are no editing controls.
 
 ### Test two departments
 
@@ -151,9 +153,35 @@ Dashboard counts always cover the **entire authenticated department**, independe
 
 The entire `.local-data/` directory is ignored by Git and must stay outside `public/`. Never commit terminal credentials or account/session data. To invalidate all demo sessions manually, stop the server, verify `.local-data/sessions` is the intended local directory, and remove **only** its session files. Do not remove requests/photos. If you intentionally regenerate accounts later, preserve any existing account file first; the seed command deliberately provides no silent overwrite option.
 
-**This authentication is for local fictional-data testing only. It is not production-ready.** It does not include internet-facing abuse protection or a production account lifecycle. Supabase and the remaining MVP steps are still postponed.
+**This authentication is for local fictional-data testing only. It is not production-ready.** It does not include internet-facing abuse protection or a production account lifecycle. Supabase and Steps 7–8 are still postponed.
 
 References: [Node.js crypto](https://nodejs.org/api/crypto.html), [OWASP scrypt guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#scrypt), and [Next.js cookies](https://nextjs.org/docs/app/api-reference/functions/cookies).
+
+## Step 6: Open a request and its private photos
+
+1. Start the server with `npm run dev -- --hostname 127.0.0.1` and log in at `/dentist/login` using an existing fictional dentist account. Run `npm run dentists:seed` only if accounts do not exist; it never overwrites them.
+2. From `/dentist`, select an underlined **request reference**. The page `/dentist/requests/<uuid>` displays four sections: **Informations patient**, **Informations de la demande**, **Symptômes et réponses**, and **Photos jointes**.
+3. Check the patient's identity/contact fields, request metadata, description, and symptoms. Question labels come directly from `patient-data.ts`. Every question for the chosen reason is shown. **Oui**, **Non**, **Je ne sais pas**, and pain intensity **0** remain explicit answers. Missing/blank answers show **Non renseigné**, never an assumed Non. Optional email is shown only when provided.
+4. Select **Agrandir** on a photo preview. The native dialog enlarges it; **Fermer** or Escape closes it and restores keyboard focus. Photos remain protected in both preview and enlarged views. A request without photos shows **Aucune photo jointe à cette demande**.
+5. Use **Retour au tableau de bord** to return to the dashboard. Existing dashboard counts, filters, login, and logout remain available. This step never writes a request or changes its status/priority.
+
+### Private access and department checks
+
+`src/lib/dentist/request-details.ts` is a server-only reader of existing `.local-data/requests/<uuid>.json` and `.local-data/photos/` files. It validates UUIDs before constructing file paths, verifies the current dentist session, and compares the request's department with the department in the current dentist account. No browser-provided department grants access.
+
+The page receives an explicit projection of identity, request, and clinical fields. It never receives tracking hashes, session tokens, password hashes, or Storage/filesystem paths. The gallery's client component receives only request/photo IDs. The shared dentist shell preserves the dashboard's navy sidebar and responsive styling.
+
+Photos use **`GET /api/dentist/requests/<id>/photos/<photoId>`**, not public static URLs or Next Image optimization. Each photo request checks session, department, photo ownership, ID format, allowed MIME type, and the expected generated storage path. Missing files, another request's photo ID, unsafe metadata, and cross-department access return the same generic 404. Unauthenticated photo requests receive 401. Dentist pages and photo responses retain **no-store**, **no-index**, and **no-referrer** protections.
+
+### Verify access restrictions with fictional records
+
+1. Submit one Endodontie request with a fictional photo, another Endodontie request without photos, and a Parodontologie request through the existing patient form. Preserve their private patient tracking links.
+2. Log in as the Endodontie dentist and open both Endodontie requests. Verify French labels, answers, gallery enlargement, empty state, and return navigation.
+3. Copy an Endodontie details URL and one protected photo URL from the image's source. Log out, then log in as the Parodontologie dentist. Both copied Endodontie resources must return generic not-found responses, while the Parodontologie request remains accessible. Changing a URL's query parameters cannot bypass department checks.
+4. Log out. Opening a details page must redirect to `/dentist/login`; accessing a protected photo must return 401. Authenticated requests with invalid or nonexistent UUIDs must return a generic 404.
+5. Confirm the patient tracking links and original submission flow still work. The automated tests exercise missing answers and unsafe paths in isolated fictional fixtures; do not edit existing patient records to test those cases.
+
+There is no request mutation endpoint, clinical evaluation, diagnosis, decision, response, transfer, appointment, or video feature in Step 6. No new dependency or storage mechanism is added.
 
 ## Step 4: Test submission and private tracking locally
 
