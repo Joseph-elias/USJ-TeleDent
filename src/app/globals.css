@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-navy: #102f50;
+  --color-light-blue: #eaf4fc;
+  --color-background: #f7fafc;
+  --font-sans: Arial, Helvetica, sans-serif;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background: #c5e3f7;
+  color: #102f50;
+}
+
+:focus-visible {
+  outline: 3px solid #2179b5;
+  outline-offset: 5px;
+}
+
+.eyebrow {
+  color: #346588;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.skip-link {
+  position: absolute;
+  top: -5rem;
+  left: 1rem;
+  z-index: 50;
+  border-radius: 0.5rem;
+  background: white;
+  padding: 0.75rem 1rem;
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
