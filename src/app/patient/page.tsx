@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import { PortalPlaceholder } from "@/components/portal-placeholder";
+import { PatientFlow } from "@/components/patient/patient-flow";
 
-export const metadata: Metadata = { title: "Patient Portal" };
+export const metadata: Metadata = {
+  title: "Espace patient",
+  description: "Préparez votre demande dentaire avec USJ TeleDent. Interface locale sans envoi de données.",
+};
 
 export default function PatientPage() {
-  return <PortalPlaceholder audience="Patient" description="Welcome to your future connection with dental professionals through USJ TeleDent." />;
+  return <PatientFlow />;
 }

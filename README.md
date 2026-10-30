@@ -2,15 +2,15 @@
 
 A teledentistry website connecting patients with dental professionals.
 
-## Step 1 scope
+## Project scope
 
-This initial setup contains a responsive homepage and two placeholder pages:
+The application contains three responsive pages:
 
 - `/` — USJ TeleDent homepage with Patient Portal and Dentist Portal links.
-- `/patient` — mobile-first patient placeholder.
+- `/patient` — mobile-first French patient interface with a local multi-step form.
 - `/dentist` — desktop-first dentist placeholder.
 
-The Step 1 pages are preserved. Step 2 adds Supabase configuration and a database migration only. Portal features, authentication, patient forms, request submission, tracking, and the dentist dashboard are not implemented.
+Step 3 implements the French patient interface at `/patient`. The homepage and dentist placeholder remain functional. Step 2 Supabase files are prepared but **not deployed**. The MVP stays entirely local until the complete workflow works: do not connect Supabase or supply database credentials for this step. Request submission, persistence, tracking, authentication, and the dentist dashboard are not implemented.
 
 ## Technology
 
@@ -66,11 +66,14 @@ src/
     globals.css          Shared styles and Tailwind theme
     layout.tsx           Shared header, footer, and metadata
     page.tsx             Homepage
-    patient/page.tsx     Patient placeholder
+    patient/page.tsx     French patient interface
     dentist/page.tsx     Dentist placeholder
   components/
     brand.tsx            Homepage brand link
     portal-placeholder.tsx
+  components/patient/
+    patient-data.ts      Static departments, reasons, and question definitions
+    patient-flow.tsx     Browser-only multi-step patient form
   lib/supabase/
     server.ts            Server-only, unprivileged Supabase client factory
 supabase/
@@ -79,7 +82,24 @@ supabase/
   verify.sql             SQL checks to run after applying the migration
 ```
 
-## Step 2: Supabase setup
+## Step 3: Test the local patient interface
+
+Run `npm run dev` and open [http://localhost:3000/patient](http://localhost:3000/patient). No `.env.local`, Supabase project, or credentials are needed.
+
+1. Choose one of the four patient entry options.
+2. Try **Suivant** with empty identification fields: French validation errors should appear. Fill in the required fields; email is optional. A future birth date or invalid email/phone is rejected.
+3. Choose a contact reason, then answer its questions and add a description. Pain, swelling, bleeding, trauma, restoration/prosthesis, follow-up, consultation, and other problems each have relevant questions. Answers start empty; use **Je ne sais pas** for uncertainty. Switching reason preserves separate answers for each reason; the summary shows only the active reason's answers.
+4. Optionally attach up to three JPEG, PNG, or WebP photos (maximum 5 MiB / 5,242,880 bytes each). Check previews and removal; try a fourth image, an oversized file, and an unsupported format. Photos are never uploaded.
+5. Choose one of the six departments, then review the summary. Use **Précédent** to edit information; values and photos remain available while navigating.
+6. Click **Envoyer ma demande**: a French message confirms that nothing was sent or saved and that this feature will be available in Step 4. This is not a successful submission.
+7. Resize between mobile and desktop widths and test keyboard navigation. The warning about immediate emergency care remains visible throughout. No diagnosis or automatic clinical decision is made.
+8. Reload the page: all entries and photos disappear. There is no localStorage, sessionStorage, file, API, or database persistence.
+
+The shared header, footer, skip link, and brand accessibility label are in French so the patient experience has no English shell text. No mockup assets were available in the repository or attached conversation; the implementation follows the specified navy, white, light blue, and clean-card direction.
+
+Emergency warning wording is based on [NHS guidance about serious dental emergencies](https://www.nhs.uk/nhs-services/dentists/how-to-find-an-nhs-dentist-in-an-emergency/) and [breathing/swallowing difficulty](https://www.nhs.uk/symptoms/toothache/). It refers to local emergency services without assuming a country-specific phone number.
+
+## Step 2: Supabase setup (deferred; do not execute for the local MVP)
 
 The migration is prepared locally. It has **not been applied to a hosted database**. No existing Supabase account project has been modified. Database and Storage verification remains pending until you choose a dedicated project and execute the SQL.
 
