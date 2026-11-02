@@ -1,0 +1,8 @@
+[
+  { "department": "Chirurgie bucco-dentaire", "email": "service1.710a69@usj-teledent.test", "password": "3Fo7tnUmCVpNZd2Q5sl4" },
+  { "department": "Parodontologie", "email": "service2.710a69@usj-teledent.test", "password": "8Etzc8HKeKKVYMH_ezKd" },
+  { "department": "Endodontie", "email": "service3.710a69@usj-teledent.test", "password": "CnRLDbAsQlJsoyc34YtJ" },
+  { "department": "Dentisterie restauratrice / conjointe", "email": "service4.710a69@usj-teledent.test", "password": "zbHn_XxxDn3hpe6igk9h" },
+  { "department": "Pédodontie", "email": "service5.710a69@usj-teledent.test", "password": "Kc4Es5idUAk-T61kcOS5" },
+  { "department": "Urgences", "email": "service6.710a69@usj-teledent.test", "password": "DY80EZ7Pm8BFccyZRw2L" }
+]

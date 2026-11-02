@@ -72,15 +72,17 @@ test("account generation creates six departments and never overwrites accounts o
   await isolated(async (directory) => {
     await fs.mkdir(".local-data/requests", { recursive: true });
     await fs.writeFile(".local-data/requests/preserve.json", "FICTIONAL PRESERVED PATIENT");
-    const run = () => promisify(execFile)(process.execPath, ["--experimental-strip-types", "--experimental-default-type=module", path.join(workspace, "scripts/create-dentists.mjs")], { cwd: directory });
+    const run = () => promisify(execFile)(process.execPath, ["--experimental-strip-types", path.join(workspace, "scripts/create-dentists.mjs")], { cwd: directory });
     const result = await run();
     const raw = await fs.readFile(".local-data/dentists.json", "utf8");
     const data = JSON.parse(raw);
+    const fixture = JSON.parse(await fs.readFile(path.join(workspace, "scripts/fixtures/dentist-test-accounts.json"), "utf8"));
     const { departments } = load("src/components/patient/patient-data.ts");
     assert.deepEqual(data.map(item => item.department), [...departments]);
     assert.equal(new Set(data.map(item => item.id)).size, 6);
     const generated = [...result.stdout.matchAll(/Email : (.+)\r?\nMot de passe TEST : (.+)/g)];
     assert.equal(generated.length, 6);
+    assert.deepEqual(generated.map(([, email, password]) => ({ email, password })), fixture.map(({ email, password }) => ({ email, password })));
     for (const [, email, password] of generated) {
       assert.equal(raw.includes(password), false);
       assert.equal(await passwords.verifyPassword(password, data.find(item => item.email === email).password_hash), true);

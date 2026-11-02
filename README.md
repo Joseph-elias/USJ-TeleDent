@@ -35,7 +35,7 @@ From the project directory:
 npm ci
 ```
 
-No environment variables, database credentials, or external services are required. The patient flow needs no setup. Generate local dentist test credentials with `npm run dentists:seed` as described below. Keep the deferred Supabase setup unexecuted.
+No environment variables, database credentials, or external services are required. The patient flow needs no setup. `npm ci` automatically creates the six shared dentist test accounts on a fresh installation. See [dentist test accounts and passwords](docs/dentist-test-accounts.md). If installation scripts are disabled, run `npm run dentists:seed` manually. Keep the deferred Supabase setup unexecuted.
 
 ## Start development
 
@@ -122,16 +122,16 @@ npm run dentists:seed
 npm run dev -- --hostname 127.0.0.1
 ```
 
-The account command creates **one fictional dentist for each of the six existing departments** in `.local-data/dentists.json`. It prints each email and randomly generated TEST password to your terminal **once**. Keep that output privately; plaintext passwords are not saved and cannot be recovered from hashes. No account or patient file is overwritten. Running the command again reports that the accounts already exist and leaves them unchanged. There is no public registration, password-reset page, or account-management API.
+The account command creates **one fictional dentist for each of the six existing departments** in `.local-data/dentists.json`, using the shared [test accounts and passwords](docs/dentist-test-accounts.md) committed for local demonstrations. It also runs automatically after `npm ci`. Passwords in the repository are visible to everyone with repository access; use fictional patient data only. Local accounts store salted password hashes. No account or patient file is overwritten. Running the command again reports that the accounts already exist and leaves them unchanged, including older accounts and passwords. There is no public registration, password-reset page, or account-management API.
 
 Open [http://127.0.0.1:3000/dentist/login](http://127.0.0.1:3000/dentist/login) and enter a generated email and password. Visiting `/dentist` without a valid session redirects to login. The dashboard displays the dentist's identity, department, summary cards, and request table. Select a reference to open clinical details and the Step 7 evaluation panel. The original patient information and photos remain read-only. The sidebar provides **Se déconnecter**.
 
 ### Test two departments
 
 1. In the existing patient interface, submit a **fictional** request addressed to **Endodontie** and another to **Parodontologie**. Keep both private tracking links.
-2. Log in as the generated Endodontie account (`dentiste3@usj-teledent.test`) using its printed password. Confirm its name/service, the Endodontie request, and absence of Parodontologie patients.
+2. Log in as the generated Endodontie account (`service3.710a69@usj-teledent.test`) using its shared test password (or its existing password on older installations). Confirm its name/service, the Endodontie request, and absence of Parodontologie patients.
 3. Test **Toutes**, **Nouvelles**, **En cours**, **Répondues**, **Rendez-vous proposé**, and **Clôturées**, plus priorities **Toutes**, **Normale**, **Haute**, then **Appliquer**. Fresh submissions are `nouveau` / `normal`; evaluations update these fields.
-4. Log out, then log in as the Parodontologie account (`dentiste2@usj-teledent.test`). Confirm it sees its own service's requests only. Changing URL parameters such as `department=Endodontie` cannot change this access.
+4. Log out, then log in as the Parodontologie account (`service2.710a69@usj-teledent.test`). Confirm it sees its own service's requests only. Changing URL parameters such as `department=Endodontie` cannot change this access.
 5. Log out and reopen `/dentist`: it must redirect to login. Calling `GET /api/dentist/requests` without a session must return 401. The old session is invalid even if its old cookie is replayed.
 6. Open both patient tracking links and verify that Step 4 still works. Existing patient requests/photos are not changed or deleted by login, filtering, seeding, or logout.
 
@@ -152,7 +152,7 @@ Dashboard counts cover the **entire authenticated department**, independent of t
 | `POST /api/dentist/logout` | Same-origin POST; revokes the session and redirects to login. |
 | `GET /api/dentist/requests?status=all&priority=all` | Authenticated, department-scoped dashboard rows/counts; 401 without a valid session. |
 
-The entire `.local-data/` directory is ignored by Git and must stay outside `public/`. Never commit terminal credentials or account/session data. To invalidate all demo sessions manually, stop the server, verify `.local-data/sessions` is the intended local directory, and remove **only** its session files. Do not remove requests/photos. If you intentionally regenerate accounts later, preserve any existing account file first; the seed command deliberately provides no silent overwrite option.
+The entire `.local-data/` directory is ignored by Git and must stay outside `public/`. Only the intentional shared test credentials in `scripts/fixtures/dentist-test-accounts.json` and their documentation are committed; never commit real credentials or local account/session/patient data. To invalidate all demo sessions manually, stop the server, verify `.local-data/sessions` is the intended local directory, and remove **only** its session files. Do not remove requests/photos. If you intentionally regenerate accounts later, preserve any existing account file first; the seed command deliberately provides no silent overwrite option.
 
 **This authentication is for local fictional-data testing only. It is not production-ready.** It does not include internet-facing abuse protection or a production account lifecycle. Supabase and Step 8 remain postponed.
 
@@ -197,7 +197,7 @@ No database, external credentials, or services are needed. Use existing dentist 
 ### Complete patient-to-dentist workflow
 
 1. At `/patient`, submit a new **fictional** request (optionally with fictional photos), select **Endodontie**, and save its private tracking link.
-2. At `/dentist/login`, log in as the Endodontie dentist (`dentiste3@usj-teledent.test`) with the existing generated password. Open the request reference from the dashboard.
+2. At `/dentist/login`, log in as the Endodontie dentist (`service3.710a69@usj-teledent.test`) with the password from docs/dentist-test-accounts.md (or its existing password on older installations). Open the request reference from the dashboard.
 3. Review the original information, symptoms, and private photos. Under **Évaluation du dentiste**, choose priority, decision, status, and your own fictional response. The application never generates clinical advice.
 4. Select **Enregistrer la décision**. A loading state prevents duplicate clicks, and errors preserve your form. On success, the saved decision, response, status, priority, and any proposal/instructions are displayed. Refresh the page to verify persistence.
 5. Open or refresh the patient's **existing private tracking link**. It displays the current department, French status/decision labels, response, and relevant appointment or call/video information. There are no email/SMS notifications; patients revisit this private link.
@@ -218,7 +218,7 @@ Appointment inputs use the local timezone of the dentist's device and are saved 
 
 Choose **Réorientation vers un autre département**, select a different one of the six existing departments, and optionally enter a note under **Réponse au patient / Note de réorientation**. This note is visible to the patient and receiving service, not an internal staff note.
 
-After saving, a confirmation appears on the original dentist's dashboard and the case disappears from that service. The original department can no longer read details/photos or update it. Log out and sign in as the receiving department (for example Parodontologie, `dentiste2@usj-teledent.test`) to see the same request and continue its evaluation. The request ID, reference, original submission, photo metadata, and tracking hash are preserved; the patient's original private link and photos remain valid.
+After saving, a confirmation appears on the original dentist's dashboard and the case disappears from that service. The original department can no longer read details/photos or update it. Log out and sign in as the receiving department (for example Parodontologie, `service2.710a69@usj-teledent.test`) to see the same request and continue its evaluation. The request ID, reference, original submission, photo metadata, and tracking hash are preserved; the patient's original private link and photos remain valid.
 
 ### Protected update endpoint and storage
 
