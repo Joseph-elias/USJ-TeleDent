@@ -1,9 +1,12 @@
 "use client";
+import { useI18n } from "@/components/i18n";
 
 import { useEffect, useRef, useState } from "react";
 import type { SubmissionResult } from "@/lib/requests/types";
+import { Icon, StatusBadge, controlClass, primaryClass, secondaryClass } from "@/components/ui";
 
 export function SubmissionConfirmation({ result }: { result: SubmissionResult }) {
+  const { t } = useI18n();
   const [copyMessage, setCopyMessage] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
   const link = useRef<HTMLInputElement>(null);
@@ -23,22 +26,26 @@ export function SubmissionConfirmation({ result }: { result: SubmissionResult })
     }
   }
 
-  return <div lang="fr" className="mx-auto w-full max-w-3xl px-5 py-12 sm:px-8">
-    <p className="eyebrow">Confirmation</p>
-    <h1 ref={heading} tabIndex={-1} className="mt-4 text-3xl font-semibold tracking-tight">Votre demande a été enregistrée</h1>
-    <div className="mt-7 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
-      <p className="text-sm text-slate-500">Référence de la demande</p>
-      <p className="mt-2 break-all font-semibold">{result.request_reference}</p>
-      <p className="mt-5 inline-block rounded-full bg-light-blue px-4 py-2 text-sm font-semibold">Statut : Nouveau</p>
-      <p className="mt-6 text-sm leading-6 text-slate-600">Votre demande et ses photos sont enregistrées sur le serveur local de ce prototype. Conservez votre lien privé : il est nécessaire pour retrouver votre suivi. Toute personne qui possède ce lien peut consulter ce suivi et les photos jointes. Ne le partagez pas publiquement.</p>
-      <label htmlFor="tracking-link" className="mt-6 block text-sm font-semibold">Votre lien privé de suivi</label>
-      <input ref={link} id="tracking-link" readOnly onFocus={(event) => event.currentTarget.select()} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 text-sm" />
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-        <a href={result.tracking_path} referrerPolicy="no-referrer" className="rounded-xl bg-navy px-5 py-3 text-center text-sm font-semibold text-white hover:bg-sky-900">Voir ma demande</a>
-        <button type="button" onClick={copyLink} className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold hover:bg-light-blue">Copier le lien privé</button>
+  return <div className="mx-auto w-full max-w-2xl px-5 py-8 sm:px-8 sm:py-12">
+    <span className="mb-6 inline-flex size-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800"><Icon name="check" className="size-7" /></span>
+    <p className="eyebrow">{t("Demande envoyée")}</p>
+    <h1 ref={heading} tabIndex={-1} className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{t("C’est enregistré.")}<br />{t("Gardons le lien.")}</h1>
+    <p className="mt-4 text-sm leading-7 text-slate-600">{t("Votre demande et ses photos sont enregistrées sur le serveur local de ce prototype. Retrouvez la réponse de votre service depuis votre suivi privé.")}</p>
+    <div className="surface mt-7 p-5 sm:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs font-medium text-slate-500">{t("Référence de la demande")}</p><StatusBadge status="nouveau">{t("Nouveau")}</StatusBadge></div>
+      <p className="mt-3 break-all font-mono text-sm font-semibold"><bdi dir="ltr">{result.request_reference}</bdi></p>
+      <div className="mt-6 border-t border-slate-100 pt-5">
+        <h2 className="flex items-center gap-2 text-base font-semibold"><Icon name="shield" className="text-accent" />{t("Conservez votre lien privé")}</h2>
+        <p id="tracking-link-help" className="mt-3 text-sm leading-6 text-slate-600">{t("Ce lien est nécessaire pour retrouver votre suivi. Toute personne qui le possède peut consulter ce suivi et les photos jointes. Ne le partagez pas publiquement.")}</p>
+        <label htmlFor="tracking-link" className="mt-5 block text-sm font-semibold">{t("Votre lien privé de suivi")}</label>
+        <input ref={link} id="tracking-link" dir="ltr" readOnly aria-describedby="tracking-link-help" onFocus={(event) => event.currentTarget.select()} className={`${controlClass} font-mono`} />
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+          <a href={result.tracking_path} referrerPolicy="no-referrer" className={primaryClass}>{t("Voir ma demande")}<Icon name="arrow" className="size-4" /></a>
+          <button type="button" onClick={copyLink} className={secondaryClass}>{t("Copier le lien privé")}</button>
+        </div>
+        <p role="status" className="mt-3 text-sm leading-6 text-accent">{t(copyMessage)}</p>
       </div>
-      <p role="status" className="mt-4 text-sm leading-6">{copyMessage}</p>
     </div>
-    <a href="/patient" className="mt-6 inline-block text-sm font-semibold underline">Retour à l’espace patient</a>
+    <a href="/patient" className="text-link mt-5"><Icon name="back" className="size-4" />{t("Retour à l’espace patient")}</a>
   </div>;
 }

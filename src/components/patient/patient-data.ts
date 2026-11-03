@@ -11,7 +11,7 @@ export const purposes = [
 ] as const;
 
 const yesNo = ["Oui", "Non", "Je ne sais pas"];
-export type Question = { id: string; label: string; options?: readonly string[] };
+export type Question = { id: string; label: string; options?: readonly string[]; description?: boolean };
 export type Reason = { id: string; label: string; questions: Question[] };
 
 export const reasons: Reason[] = [
@@ -45,15 +45,15 @@ export const reasons: Reason[] = [
     { id: "pain", label: "Avez-vous une douleur ?", options: yesNo },
   ] },
   { id: "followup", label: "Suivi après un traitement", questions: [
-    { id: "treatment", label: "Quel traitement avez-vous reçu et à quelle date ?" },
+    { id: "treatment", description: true, label: "Quel traitement avez-vous reçu et à quelle date ?" },
     { id: "evolution", label: "Comment votre état évolue-t-il ?", options: ["Il s’améliore", "Il reste stable", "Il s’aggrave", "Je ne sais pas"] },
   ] },
   { id: "consultation", label: "Demande de consultation", questions: [
-    { id: "objective", label: "Quel est l’objectif de votre consultation ?" },
+    { id: "objective", description: true, label: "Quel est l’objectif de votre consultation ?" },
     { id: "symptoms", label: "Avez-vous actuellement des symptômes ?", options: yesNo },
   ] },
   { id: "other", label: "Autre problème", questions: [
-    { id: "subject", label: "Quel problème ou quelle question souhaitez-vous aborder ?" },
+    { id: "subject", description: true, label: "Quel problème ou quelle question souhaitez-vous aborder ?" },
     { id: "onset", label: "Depuis quand cela vous concerne-t-il ?" },
   ] },
 ];

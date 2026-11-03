@@ -1,0 +1,485 @@
+[
+  {
+    "client": 305,
+    "fields": [
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 146
+      }
+    ],
+    "screen": "clinical-case",
+    "scroll": 305,
+    "width": 320
+  },
+  {
+    "client": 360,
+    "fields": [
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 146
+      }
+    ],
+    "screen": "clinical-case",
+    "scroll": 360,
+    "width": 375
+  },
+  {
+    "client": 375,
+    "fields": [
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 146
+      }
+    ],
+    "screen": "clinical-case",
+    "scroll": 375,
+    "width": 390
+  },
+  {
+    "client": 415,
+    "fields": [
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 146
+      }
+    ],
+    "screen": "clinical-case",
+    "scroll": 415,
+    "width": 430
+  },
+  {
+    "client": 753,
+    "fields": [
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 146
+      }
+    ],
+    "screen": "clinical-case",
+    "scroll": 753,
+    "width": 768
+  },
+  {
+    "client": 1009,
+    "fields": [
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 146
+      }
+    ],
+    "screen": "clinical-case",
+    "scroll": 1009,
+    "width": 1024
+  },
+  {
+    "client": 1425,
+    "fields": [
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 49
+      },
+      {
+        "font": "16px",
+        "height": 146
+      }
+    ],
+    "screen": "clinical-case",
+    "scroll": 1425,
+    "width": 1440
+  },
+  {
+    "cardsVisible": true,
+    "client": 305,
+    "screen": "dashboard",
+    "scroll": 305,
+    "tableVisible": false,
+    "width": 320
+  },
+  {
+    "cardsVisible": true,
+    "client": 360,
+    "screen": "dashboard",
+    "scroll": 360,
+    "tableVisible": false,
+    "width": 375
+  },
+  {
+    "cardsVisible": true,
+    "client": 375,
+    "screen": "dashboard",
+    "scroll": 375,
+    "tableVisible": false,
+    "width": 390
+  },
+  {
+    "cardsVisible": true,
+    "client": 415,
+    "screen": "dashboard",
+    "scroll": 415,
+    "tableVisible": false,
+    "width": 430
+  },
+  {
+    "cardsVisible": true,
+    "client": 753,
+    "screen": "dashboard",
+    "scroll": 753,
+    "tableVisible": false,
+    "width": 768
+  },
+  {
+    "cardsVisible": true,
+    "client": 1009,
+    "screen": "dashboard",
+    "scroll": 1009,
+    "tableVisible": false,
+    "width": 1024
+  },
+  {
+    "cardsVisible": false,
+    "client": 1425,
+    "screen": "dashboard",
+    "scroll": 1425,
+    "tableVisible": true,
+    "width": 1440
+  },
+  {
+    "client": 305,
+    "screen": "home",
+    "scroll": 305,
+    "width": 320
+  },
+  {
+    "client": 360,
+    "screen": "home",
+    "scroll": 360,
+    "width": 375
+  },
+  {
+    "client": 375,
+    "screen": "home",
+    "scroll": 375,
+    "width": 390
+  },
+  {
+    "client": 415,
+    "screen": "home",
+    "scroll": 415,
+    "width": 430
+  },
+  {
+    "client": 753,
+    "screen": "home",
+    "scroll": 753,
+    "width": 768
+  },
+  {
+    "client": 1009,
+    "screen": "home",
+    "scroll": 1009,
+    "width": 1024
+  },
+  {
+    "client": 1425,
+    "screen": "home",
+    "scroll": 1425,
+    "width": 1440
+  },
+  {
+    "client": 305,
+    "screen": "tracking",
+    "scroll": 305,
+    "width": 320
+  },
+  {
+    "client": 360,
+    "screen": "tracking",
+    "scroll": 360,
+    "width": 375
+  },
+  {
+    "client": 375,
+    "screen": "tracking",
+    "scroll": 375,
+    "width": 390
+  },
+  {
+    "client": 415,
+    "screen": "tracking",
+    "scroll": 415,
+    "width": 430
+  },
+  {
+    "client": 753,
+    "screen": "tracking",
+    "scroll": 753,
+    "width": 768
+  },
+  {
+    "client": 1009,
+    "screen": "tracking",
+    "scroll": 1009,
+    "width": 1024
+  },
+  {
+    "client": 1425,
+    "screen": "tracking",
+    "scroll": 1425,
+    "width": 1440
+  },
+  {
+    "client": 305,
+    "screen": "patient-entry",
+    "scroll": 305,
+    "width": 320
+  },
+  {
+    "client": 360,
+    "screen": "patient-entry",
+    "scroll": 360,
+    "width": 375
+  },
+  {
+    "client": 375,
+    "screen": "patient-entry",
+    "scroll": 375,
+    "width": 390
+  },
+  {
+    "client": 415,
+    "screen": "patient-entry",
+    "scroll": 415,
+    "width": 430
+  },
+  {
+    "client": 753,
+    "screen": "patient-entry",
+    "scroll": 753,
+    "width": 768
+  },
+  {
+    "client": 1009,
+    "screen": "patient-entry",
+    "scroll": 1009,
+    "width": 1024
+  },
+  {
+    "client": 1425,
+    "screen": "patient-entry",
+    "scroll": 1425,
+    "width": 1440
+  },
+  {
+    "client": 305,
+    "inputFonts": [
+      "16px",
+      "16px",
+      "16px",
+      "16px",
+      "16px"
+    ],
+    "screen": "patient-identification",
+    "scroll": 305,
+    "width": 320
+  },
+  {
+    "client": 360,
+    "inputFonts": [
+      "16px",
+      "16px",
+      "16px",
+      "16px",
+      "16px"
+    ],
+    "screen": "patient-identification",
+    "scroll": 360,
+    "width": 375
+  },
+  {
+    "client": 375,
+    "inputFonts": [
+      "16px",
+      "16px",
+      "16px",
+      "16px",
+      "16px"
+    ],
+    "screen": "patient-identification",
+    "scroll": 375,
+    "width": 390
+  },
+  {
+    "client": 415,
+    "inputFonts": [
+      "16px",
+      "16px",
+      "16px",
+      "16px",
+      "16px"
+    ],
+    "screen": "patient-identification",
+    "scroll": 415,
+    "width": 430
+  },
+  {
+    "client": 753,
+    "inputFonts": [
+      "16px",
+      "16px",
+      "16px",
+      "16px",
+      "16px"
+    ],
+    "screen": "patient-identification",
+    "scroll": 753,
+    "width": 768
+  },
+  {
+    "client": 1009,
+    "inputFonts": [
+      "16px",
+      "16px",
+      "16px",
+      "16px",
+      "16px"
+    ],
+    "screen": "patient-identification",
+    "scroll": 1009,
+    "width": 1024
+  },
+  {
+    "client": 1425,
+    "inputFonts": [
+      "16px",
+      "16px",
+      "16px",
+      "16px",
+      "16px"
+    ],
+    "screen": "patient-identification",
+    "scroll": 1425,
+    "width": 1440
+  },
+  {
+    "client": 305,
+    "screen": "dentist-login",
+    "scroll": 305,
+    "width": 320
+  },
+  {
+    "client": 360,
+    "screen": "dentist-login",
+    "scroll": 360,
+    "width": 375
+  },
+  {
+    "client": 375,
+    "screen": "dentist-login",
+    "scroll": 375,
+    "width": 390
+  },
+  {
+    "client": 415,
+    "screen": "dentist-login",
+    "scroll": 415,
+    "width": 430
+  },
+  {
+    "client": 753,
+    "screen": "dentist-login",
+    "scroll": 753,
+    "width": 768
+  },
+  {
+    "client": 1009,
+    "screen": "dentist-login",
+    "scroll": 1009,
+    "width": 1024
+  },
+  {
+    "client": 1425,
+    "screen": "dentist-login",
+    "scroll": 1425,
+    "width": 1440
+  }
+]

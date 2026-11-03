@@ -1,30 +1,35 @@
-import type { Metadata } from "next";
-import { Brand } from "@/components/brand";
+import { getI18n } from "@/lib/i18n/server";
+import type { Metadata, Viewport } from "next";
+import { AppHeader } from "@/components/app-header";
+import { LanguageProvider } from "@/components/i18n";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: { default: "USJ TeleDent | Dental care, connected", template: "%s | USJ TeleDent" },
-  description: "USJ TeleDent is a teledentistry project connecting patients with dental professionals.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return {
+    title: { default: `USJ TeleDent | ${t("Votre santé dentaire, en lien")}`, template: "%s | USJ TeleDent" },
+    description: t("Un espace pour transmettre votre demande dentaire et échanger avec les professionnels de l’USJ."),
+  };
+}
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export const viewport: Viewport = { themeColor: "#102f50", width: "device-width", initialScale: 1, viewportFit: "cover" };
+
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const { t, locale } = await getI18n();
   return (
-    <html lang="fr">
+    <html lang={locale} dir={locale === "ar" ? "rtl" : "ltr"}>
       <body className="flex min-h-dvh flex-col bg-background text-navy antialiased">
-        <a href="#main-content" className="skip-link">Aller au contenu</a>
-        <header className="border-b border-slate-200/70 bg-white">
-          <div className="mx-auto flex min-h-24 max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5 sm:px-10">
-            <Brand />
-            <span className="text-xs font-medium tracking-wide text-slate-500 sm:text-sm">Patients et professionnels, en lien</span>
-          </div>
-        </header>
-        <main id="main-content" className="flex flex-1 flex-col">{children}</main>
-        <footer className="border-t border-slate-200/70 bg-white">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-6 text-xs leading-6 text-slate-500 sm:flex-row sm:justify-between sm:px-10">
-            <p>USJ TeleDent</p>
-            <p>Un lien vers une meilleure santé bucco-dentaire.</p>
+        <LanguageProvider initialLocale={locale}>
+        <a href="#main-content" className="skip-link">{t("Aller au contenu")}</a>
+        <AppHeader />
+        <main id="main-content" tabIndex={-1} className="flex min-w-0 flex-1 flex-col">{children}</main>
+        <footer className="border-t border-slate-200/70 bg-white pb-[env(safe-area-inset-bottom)]">
+          <div className="page-container flex flex-col gap-1 py-5 text-xs leading-6 text-slate-500 sm:flex-row sm:justify-between">
+            <p><span className="font-semibold text-navy">{t("USJ TeleDent")}</span> {t(" · Patients et professionnels, en lien")}</p>
+            <p>{t("Prototype local · Données fictives uniquement")}</p>
           </div>
         </footer>
+        </LanguageProvider>
       </body>
     </html>
   );

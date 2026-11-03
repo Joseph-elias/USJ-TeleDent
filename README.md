@@ -17,6 +17,22 @@ Steps 3–6 provide patient submission/tracking, local dentist login, a departme
 
 **This is a local development prototype. Use fictional patient data only. Do not deploy filesystem-backed storage as a production system.**
 
+## Responsive interface
+
+The patient and dentist portals adapt to phones, tablets and PCs. The shared interface uses consistent French copy, accessible form controls and status badges. Patient forms include progress, recap editing and private tracking with manual refresh. The dentist workspace uses request cards below 1280px, a desktop table on larger screens, compact phone navigation and clinical section links.
+
+See [the implementation plan](docs/mobile-ui-plan.md) and [verification notes](docs/ui-verification.md) for the screen-width matrix, tested journeys and remaining real-device checks. The application remains a local prototype; responsive support does not add offline access or production hosting.
+
+## Voice dictation
+
+Descriptive patient answers and dentist response/instruction fields offer **Dicter ce texte**. Choose a language, start the microphone, speak, stop, then review the editable transcription. Short duration answers, identity fields, dates and choices keep their existing controls.
+
+This uses browser speech recognition, whose availability and language support vary. Some browsers process audio through an online speech service; the UI explains this before the microphone starts. Typing remains available. The app stores the resulting text, not audio files. See [voice dictation behavior and checks](docs/voice-dictation.md).
+
+## Website language
+
+Use the top language selector to choose **Français**, **English** or **العربية** across both portals. The preference is remembered; Arabic uses a right-to-left layout. Switching language preserves in-progress form text. Descriptions and dentist-written responses remain in their original language, and stored answer identifiers remain unchanged. See [language support and checks](docs/language-support.md).
+
 ## Technology
 
 - Next.js with the App Router

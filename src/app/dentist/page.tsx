@@ -1,3 +1,4 @@
+import { getI18n } from "@/lib/i18n/server";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { DentistDashboard } from "@/components/dentist/dashboard";
@@ -6,7 +7,10 @@ import { currentDentistToken } from "@/lib/dentist/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Tableau de bord dentiste", robots: { index: false, follow: false }, referrer: "no-referrer" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("Tableau de bord dentiste"), robots: { index: false, follow: false }, referrer: "no-referrer" };
+}
 
 export default async function DentistPage({ searchParams }: { searchParams: Promise<{ status?: string; priority?: string; transferred?: string }> }) {
   const filters = await searchParams;
