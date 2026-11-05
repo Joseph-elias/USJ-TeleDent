@@ -1,4 +1,4 @@
-import { departments, reasons } from "@/components/patient/patient-data";
+import { reasons } from "@/components/patient/patient-data";
 import type { RequestInput } from "./types";
 
 export class RequestValidationError extends Error {}
@@ -35,9 +35,6 @@ export function validateRequest(value: unknown): RequestInput {
   }
   const reason = reasons.find((item) => item.id === value.reason);
   if (!reason) throw new RequestValidationError("Choisissez un motif de contact valide.");
-  if (!departments.some((item) => item === value.department)) {
-    throw new RequestValidationError("Choisissez un service valide.");
-  }
   if (!object(value.symptom_answers)) throw new RequestValidationError("Répondez aux questions sur vos symptômes.");
   const suppliedAnswers = value.symptom_answers;
   if (Object.keys(suppliedAnswers).some((key) => !reason.questions.some((question) => question.id === key))) {
@@ -54,7 +51,6 @@ export function validateRequest(value: unknown): RequestInput {
   return {
     patient_name, patient_file_number, date_of_birth, phone, email,
     reason: reason.id,
-    department: value.department as string,
     description: text(value.description, "Description", 4000),
     symptom_answers,
   };

@@ -144,9 +144,9 @@ Open [http://127.0.0.1:3000/dentist/login](http://127.0.0.1:3000/dentist/login) 
 
 ### Test two departments
 
-1. In the existing patient interface, submit a **fictional** request addressed to **Endodontie** and another to **Parodontologie**. Keep both private tracking links.
+1. In the patient interface, submit the **fictional** Endodontie and Parodontologie examples from the [routing table](docs/patient-routing.md). Keep both private tracking links.
 2. Log in as the generated Endodontie account (`service3.710a69@usj-teledent.test`) using its shared test password (or its existing password on older installations). Confirm its name/service, the Endodontie request, and absence of Parodontologie patients.
-3. Test **Toutes**, **Nouvelles**, **En cours**, **Répondues**, **Rendez-vous proposé**, and **Clôturées**, plus priorities **Toutes**, **Normale**, **Haute**, then **Appliquer**. Fresh submissions are `nouveau` / `normal`; evaluations update these fields.
+3. Test **Toutes**, **Nouvelles**, **En cours**, **Répondues**, **Rendez-vous proposé**, and **Clôturées**, plus priorities **Toutes**, **Normale**, **Haute**, then **Appliquer**. These two examples start at `nouveau` / `normal`.
 4. Log out, then log in as the Parodontologie account (`service2.710a69@usj-teledent.test`). Confirm it sees its own service's requests only. Changing URL parameters such as `department=Endodontie` cannot change this access.
 5. Log out and reopen `/dentist`: it must redirect to login. Calling `GET /api/dentist/requests` without a session must return 401. The old session is invalid even if its old cookie is replayed.
 6. Open both patient tracking links and verify that Step 4 still works. Existing patient requests/photos are not changed or deleted by login, filtering, seeding, or logout.
@@ -212,7 +212,7 @@ No database, external credentials, or services are needed. Use existing dentist 
 
 ### Complete patient-to-dentist workflow
 
-1. At `/patient`, submit a new **fictional** request (optionally with fictional photos), select **Endodontie**, and save its private tracking link.
+1. At `/patient`, submit the **fictional** Endodontie example from the [routing table](docs/patient-routing.md), optionally attach fictional photos, and save its private tracking link.
 2. At `/dentist/login`, log in as the Endodontie dentist (`service3.710a69@usj-teledent.test`) with the password from docs/dentist-test-accounts.md (or its existing password on older installations). Open the request reference from the dashboard.
 3. Review the original information, symptoms, and private photos. Under **Évaluation du dentiste**, choose priority, decision, status, and your own fictional response. The application never generates clinical advice.
 4. Select **Enregistrer la décision**. A loading state prevents duplicate clicks, and errors preserve your form. On success, the saved decision, response, status, priority, and any proposal/instructions are displayed. Refresh the page to verify persistence.
@@ -273,7 +273,7 @@ Run `npm run dev -- --hostname 127.0.0.1` and open [http://127.0.0.1:3000/patien
 2. Try **Suivant** with empty identification fields: French validation errors should appear. Fill in the required fields; email is optional. A future birth date or invalid email/phone is rejected.
 3. Choose a contact reason, then answer its questions and add a description. Pain, swelling, bleeding, trauma, restoration/prosthesis, follow-up, consultation, and other problems each have relevant questions. Answers start empty; use **Je ne sais pas** for uncertainty. Switching reason preserves separate answers for each reason; the summary shows only the active reason's answers.
 4. Optionally attach up to three fictional JPEG, PNG, or WebP photos (maximum 5 MiB / 5,242,880 bytes each). Check previews and removal; try a fourth image, an oversized file, and an unsupported format. On submission the server also validates the count, size, declared MIME, and file signature. Multipart requests are capped at 16 MiB.
-5. Choose one of the six departments, then review the summary. Use **Précédent** to edit information; values and photos remain available while navigating.
+5. Review the summary. Use **Précédent** to edit information. The server assigns a department from the answers on submission. See the [draft routing rules](docs/patient-routing.md).
 6. Click **Envoyer ma demande**. The button shows a loading state and prevents repeated clicks. On success, **Votre demande a été enregistrée** appears with the unique reference and status **Nouveau**. No notification to a dentist is claimed or sent.
 7. Copy the private link using **Copier le lien privé**, then open **Voir ma demande**. If clipboard access is unavailable, the link is selected for manual copying. Keep this link: there is no lookup by name, file number, or public reference, and the raw token is not recoverable from the saved JSON.
 8. Verify the reference, submission date (Beyrouth time), reason, department, and status. Photos are displayed through a protected endpoint. After a dentist saves a Step 7 evaluation, the same link displays its response and any relevant manual proposal/instructions.
@@ -282,9 +282,15 @@ Run `npm run dev -- --hostname 127.0.0.1` and open [http://127.0.0.1:3000/patien
 
 Before submission, the unfinished form exists only in React state and is lost on reload. After submission, records live on the server filesystem; neither localStorage nor sessionStorage is used. If saving cannot be confirmed, the form retains its values and displays a French error. A lost HTTP response can leave an already-saved request without its confirmation; this simple local prototype has no retry deduplication or link recovery.
 
+### Returning patients
+
+Enter a fictional dossier number on the first request and select **Mémoriser mon numéro de dossier sur cet appareil pendant 90 jours**. After successful submission, start another request in the same browser and enter the same full name and date of birth. The dossier field autofills and remains editable. The name comparison ignores case and extra whitespace. Submitting with the option unchecked clears the browser's saved access. An expired cookie or a different browser requires manual entry.
+
+The number comes from the previously submitted request. The browser stores an HTTP-only cookie containing a random access token and a request ID. The server stores only the token hash and returns the number only if the cookie, full name, and date of birth all match.
+
 ### Storage and private access
 
-The server-only adapter in `src/lib/requests/storage.ts` automatically creates `.local-data/requests/` and `.local-data/photos/`. Each request is a complete JSON file named by UUID, using the Step 2 field names, a local `department` label, and photo metadata. New requests always use `status = nouveau`, `priority = normal`, and null dentist decision/response/appointment/call fields. Server validation never accepts client overrides for these values.
+The server-only adapter in `src/lib/requests/storage.ts` automatically creates `.local-data/requests/` and `.local-data/photos/`. Each request is a complete JSON file named by UUID, using the Step 2 field names, a local `department` label, and photo metadata. New requests start with `status = nouveau` and null dentist decision/response/appointment/call fields. The server derives the department and initial priority from the validated answers and birth date.
 
 Photo paths contain random UUIDs, never patient-supplied filenames. Nothing is stored under `public/`. The server writes and flushes photos and a temporary JSON file, then atomically renames the JSON file in the same directory. Readers see only committed `.json` records. Handled write/commit failures remove temporary JSON and associated photos. This is a single-machine development adapter, not a production database or crash-recovery system.
 

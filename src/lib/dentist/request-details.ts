@@ -41,7 +41,9 @@ export async function loadDentistRequest(token: string | undefined, id: string) 
       dentist_decision: record.dentist_decision ?? null, dentist_response: record.dentist_response ?? null,
       proposed_appointment_at: record.proposed_appointment_at ?? null, call_video_details: record.call_video_details ?? null,
       updated_at: record.updated_at,
-      symptoms: (reason?.questions ?? []).map((question) => {
+      symptoms: (reason?.questions ?? []).filter((question) =>
+        !question.routing || Object.hasOwn(record.symptom_answers ?? {}, question.id)
+      ).map((question) => {
         const value = record.symptom_answers?.[question.id];
         return { id: question.id, label: question.label, answer: typeof value === "string" && value.trim() ? value : null };
       }),

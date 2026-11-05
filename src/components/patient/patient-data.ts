@@ -11,10 +11,30 @@ export const purposes = [
 ] as const;
 
 const yesNo = ["Oui", "Non", "Je ne sais pas"];
-export type Question = { id: string; label: string; options?: readonly string[]; description?: boolean };
+export type Question = { id: string; label: string; options?: readonly string[]; description?: boolean; routing?: boolean };
 export type Reason = { id: string; label: string; questions: Question[] };
 
-export const reasons: Reason[] = [
+const safetyQuestions: Question[] = [
+  { id: "emergency_signs", label: "Avez-vous du mal à respirer ou à avaler, un gonflement important du visage ou du cou, un saignement abondant qui ne s’arrête pas ou une blessure grave du visage ou de la mâchoire ?", options: yesNo, routing: true },
+  { id: "urgent_signs", label: "Avez-vous une dent sortie après un choc, un gonflement qui augmente ou s’accompagne de fièvre, ou une douleur intense que vous n’arrivez pas à calmer ?", options: yesNo, routing: true },
+];
+
+export const careContexts = {
+  surgery: "Extraction, dent de sagesse ou chirurgie de la bouche",
+  gums: "Problème de gencives (par exemple, saignement au brossage) ou soins des gencives",
+  rootCanal: "Traitement des canaux d’une dent (dévitalisation)",
+  restoration: "Plombage, couronne, bridge ou prothèse",
+  unknown: "Autre / Je ne sais pas",
+} as const;
+
+const careContextQuestion: Question = {
+  id: "care_context",
+  label: "Quel problème ou quel soin est concerné ?",
+  options: Object.values(careContexts),
+  routing: true,
+};
+
+const reasonQuestions: Reason[] = [
   { id: "pain", label: "Douleur après un traitement", questions: [
     { id: "onset", label: "Depuis quand avez-vous mal ?" },
     { id: "intensity", label: "Quelle est l’intensité de la douleur ?", options: [...Array.from({ length: 11 }, (_, i) => String(i)), "Je ne sais pas"] },
@@ -58,14 +78,23 @@ export const reasons: Reason[] = [
   ] },
 ];
 
+export const reasons = reasonQuestions.map((reason) => ({
+  ...reason,
+  questions: [
+    ...safetyQuestions,
+    ...(["pain", "bleeding", "followup", "consultation", "other"].includes(reason.id) ? [careContextQuestion] : []),
+    ...reason.questions,
+  ],
+}));
+
 export const identityFields = [
   { id: "name", label: "Nom et prénom", type: "text", autocomplete: "name" },
-  { id: "fileNumber", label: "Numéro de dossier USJ", type: "text", autocomplete: "off" },
   { id: "birthDate", label: "Date de naissance", type: "date", autocomplete: "bday" },
+  { id: "fileNumber", label: "Numéro de dossier USJ", type: "text", autocomplete: "off" },
   { id: "phone", label: "Numéro de téléphone", type: "tel", autocomplete: "tel" },
   { id: "email", label: "Email facultatif", type: "email", autocomplete: "email" },
 ] as const;
 
 export type Identity = Record<(typeof identityFields)[number]["id"], string>;
 export const emptyIdentity: Identity = { name: "", fileNumber: "", birthDate: "", phone: "", email: "" };
-export const steps = ["Identification", "Motif", "Symptômes", "Photos", "Service", "Récapitulatif"];
+export const steps = ["Identification", "Motif", "Symptômes", "Photos", "Récapitulatif"];

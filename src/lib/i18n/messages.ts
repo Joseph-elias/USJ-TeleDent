@@ -1,4 +1,60 @@
 export const messages: Record<string, { en: string; ar: string }> = {
+  "Vous pouvez mémoriser votre numéro de dossier USJ sur cet appareil pour votre prochaine demande. Après l’envoi, conservez votre lien privé pour retrouver le suivi.": {
+    "en": "You can remember your USJ file number on this device for your next request. After submitting, keep your private tracking link.",
+    "ar": "يمكنك تذكّر رقم ملفك في جامعة القديس يوسف على هذا الجهاز لطلبك المقبل. بعد الإرسال، احتفظ برابط المتابعة الخاص بك."
+  },
+  "Numéro retrouvé sur cet appareil. Vérifiez-le avant de continuer.": {
+    "en": "File number recovered on this device. Check it before continuing.",
+    "ar": "تم استرجاع رقم الملف على هذا الجهاز. تحقّق منه قبل المتابعة."
+  },
+  "Mémoriser mon numéro de dossier sur cet appareil pendant 90 jours.": {
+    "en": "Remember my file number on this device for 90 days.",
+    "ar": "تذكّر رقم ملفي على هذا الجهاز لمدة 90 يومًا."
+  },
+  "Avez-vous du mal à respirer ou à avaler, un gonflement important du visage ou du cou, un saignement abondant qui ne s’arrête pas ou une blessure grave du visage ou de la mâchoire ?": {
+    "en": "Are you having trouble breathing or swallowing, significant swelling of the face or neck, heavy bleeding that will not stop, or a serious injury to the face or jaw?",
+    "ar": "هل تواجه صعوبة في التنفس أو البلع، أو تورّمًا كبيرًا في الوجه أو الرقبة، أو نزيفًا غزيرًا لا يتوقف، أو إصابة خطيرة في الوجه أو الفك؟"
+  },
+  "Avez-vous une dent sortie après un choc, un gonflement qui augmente ou s’accompagne de fièvre, ou une douleur intense que vous n’arrivez pas à calmer ?": {
+    "en": "Has a tooth been knocked out, is swelling getting worse or accompanied by fever, or do you have severe pain that you cannot relieve?",
+    "ar": "هل خرجت سنّ من مكانها بعد إصابة، أو لديك تورّم يزداد أو ترافقه حمّى، أو ألم شديد لا تستطيع تخفيفه؟"
+  },
+  "Quel problème ou quel soin est concerné ?": {
+    "en": "What problem or treatment is this about?",
+    "ar": "ما المشكلة أو العلاج الذي يتعلق به طلبك؟"
+  },
+  "Extraction, dent de sagesse ou chirurgie de la bouche": {
+    "en": "Tooth extraction, wisdom tooth, or oral surgery",
+    "ar": "خلع سنّ أو ضرس العقل أو جراحة في الفم"
+  },
+  "Problème de gencives (par exemple, saignement au brossage) ou soins des gencives": {
+    "en": "A gum problem (such as bleeding when brushing) or gum treatment",
+    "ar": "مشكلة في اللثة (مثل نزيف عند تنظيف الأسنان) أو علاج للثة"
+  },
+  "Traitement des canaux d’une dent (dévitalisation)": {
+    "en": "Root canal treatment",
+    "ar": "علاج قناة الجذر (علاج العصب)"
+  },
+  "Plombage, couronne, bridge ou prothèse": {
+    "en": "Filling, crown, bridge, or denture",
+    "ar": "حشوة أو تاج أو جسر أو طقم أسنان"
+  },
+  "Autre / Je ne sais pas": {
+    "en": "Other / I don’t know",
+    "ar": "غير ذلك / لا أعرف"
+  },
+  "Consultez immédiatement les urgences ou appelez les services d’urgence locaux. N’attendez pas une réponse en ligne.": {
+    "en": "Go to an emergency department immediately or call local emergency services. Do not wait for an online reply.",
+    "ar": "توجّه فورًا إلى قسم الطوارئ أو اتصل بخدمات الطوارئ المحلية. لا تنتظر ردًا عبر الإنترنت."
+  },
+  "Contactez dès maintenant un service d’urgence dentaire. N’attendez pas une réponse en ligne.": {
+    "en": "Contact an urgent dental care service now. Do not wait for an online reply.",
+    "ar": "تواصل الآن مع خدمة طوارئ الأسنان. لا تنتظر ردًا عبر الإنترنت."
+  },
+  "Vos réponses servent à orienter automatiquement votre demande vers un service.": {
+    "en": "Your answers are used to route your request automatically.",
+    "ar": "تُستخدم إجاباتك لتوجيه طلبك تلقائيًا إلى القسم المعني."
+  },
   "Langue du site": {
     "en": "Website language",
     "ar": "لغة الموقع"

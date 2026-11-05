@@ -4,6 +4,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import { mkdir, open, readFile, readdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { RequestValidationError } from "./validation";
+import { routeRequest } from "./routing";
 import type { RequestInput, SavedRequest, SubmissionResult, TrackingRequest } from "./types";
 
 const root = path.join(process.cwd(), ".local-data");
@@ -11,6 +12,8 @@ const requestDirectory = path.join(root, "requests");
 const photoDirectory = path.join(root, "photos");
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
+export const dossierCookieName = "usj_dossier";
+export const dossierCookieMaxAge = 90 * 24 * 60 * 60;
 const photoTypes: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
 };
@@ -21,7 +24,7 @@ function hasImageSignature(bytes: Buffer, type: string) {
   return type === "image/webp" && bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP";
 }
 
-export async function saveRequest(input: RequestInput, files: File[]): Promise<SubmissionResult> {
+export async function saveRequest(input: RequestInput, files: File[], rememberDossier = false) {
   if (files.length > 3) throw new RequestValidationError("Vous pouvez joindre au maximum 3 photos.");
   // Validate every file before touching storage. Never trust the client MIME alone.
   const photos: { bytes: Buffer; content_type: string; extension: string }[] = [];
@@ -36,12 +39,14 @@ export async function saveRequest(input: RequestInput, files: File[]): Promise<S
 
   const id = randomUUID();
   const token = randomBytes(32).toString("base64url");
+  const dossierToken = rememberDossier ? randomBytes(32).toString("base64url") : null;
   const now = new Date().toISOString();
   const record: SavedRequest = {
     ...input, id, request_reference: `USJ-${id.replaceAll("-", "").toUpperCase()}`,
-    status: "nouveau", priority: "normal", dentist_decision: null,
+    ...routeRequest(input), status: "nouveau", dentist_decision: null,
     dentist_response: null, proposed_appointment_at: null, call_video_details: null,
     tracking_token_hash: hashToken(token), created_at: now, updated_at: now,
+    ...(dossierToken && { dossier_token_hash: hashToken(dossierToken) }),
     photos: photos.map((photo) => ({
       id: randomUUID(), request_id: id, storage_path: "",
       content_type: photo.content_type, size: photo.bytes.length, created_at: now,
@@ -74,7 +79,27 @@ export async function saveRequest(input: RequestInput, files: File[]): Promise<S
     ]);
     throw error;
   }
-  return { request_reference: record.request_reference, status: "nouveau", tracking_path: `/patient/track/${token}` };
+  const result: SubmissionResult = { request_reference: record.request_reference, status: "nouveau", tracking_path: `/patient/track/${token}` };
+  return { result, dossierCookie: dossierToken ? `${id}.${dossierToken}` : null };
+}
+
+function normalizeName(name: string) {
+  return name.normalize("NFC").trim().replace(/\s+/gu, " ").toLowerCase();
+}
+
+export async function getRememberedDossier(cookie: string, name: string, birthDate: string) {
+  const [id, token, extra] = cookie.split(".");
+  if (!uuid.test(id) || !token || !/^[A-Za-z0-9_-]{43}$/.test(token) || extra !== undefined) return null;
+
+  let record: SavedRequest;
+  try { record = JSON.parse(await readFile(path.join(requestDirectory, `${id}.json`), "utf8")); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
+  const expiresAt = Date.parse(record.created_at) + dossierCookieMaxAge * 1000;
+  if (record.id !== id || !(expiresAt > Date.now()) ||
+      !record.dossier_token_hash || !/^[a-f0-9]{64}$/.test(record.dossier_token_hash) ||
+      !timingSafeEqual(Buffer.from(hashToken(token), "hex"), Buffer.from(record.dossier_token_hash, "hex")) ||
+      record.date_of_birth !== birthDate || normalizeName(record.patient_name) !== normalizeName(name)) return null;
+  return record.patient_file_number;
 }
 
 async function findRequest(token: string): Promise<SavedRequest | null> {

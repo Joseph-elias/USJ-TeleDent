@@ -20,8 +20,7 @@ export function notFoundResponse() {
 export class BodyTooLargeError extends Error {}
 
 // Bound the real streamed body, even if Content-Length is absent or incorrect.
-export async function readRequestForm(request: Request) {
-  const limit = 16 * 1024 * 1024; // Three 5 MiB images plus fields and multipart overhead.
+export async function readRequestForm(request: Request, limit = 16 * 1024 * 1024) {
   if (Number(request.headers.get("content-length")) > limit) throw new BodyTooLargeError();
   if (!request.body) throw new Error("Missing request body");
   const reader = request.body.getReader();

@@ -48,7 +48,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ token
       <dl className="mt-5 grid gap-5 text-sm sm:grid-cols-2">
         <div><dt className="text-slate-500">{t("Référence de la demande")}</dt><dd className="mt-1 break-all font-semibold"><bdi dir="ltr">{request.request_reference}</bdi></dd></div>
         <div><dt className="text-slate-500">{t("Date d’enregistrement (heure de Beyrouth)")}</dt><dd className="mt-1">{date(request.created_at, locale)}</dd></div>
-        <div><dt className="text-slate-500">{t("Service sélectionné")}</dt><dd className="mt-1">{t(request.department)}</dd></div>
+        <div><dt className="text-slate-500">{t("Service")}</dt><dd className="mt-1">{t(request.department)}</dd></div>
         <div><dt className="text-slate-500">{t("Motif de contact")}</dt><dd className="mt-1">{t(reasons.find((reason) => reason.id === request.reason)?.label ?? request.reason)}</dd></div>
         <div><dt className="text-slate-500">{t("Statut actuel")}</dt><dd className="mt-2 inline-block rounded-full bg-light-blue px-4 py-2 font-semibold">{t(statusLabels[request.status] ?? request.status)}</dd></div>
       </dl>

@@ -7,7 +7,6 @@ export type RequestInput = {
   reason: string;
   description: string;
   symptom_answers: Record<string, string>;
-  department: string;
 };
 
 export type PhotoMetadata = {
@@ -20,6 +19,7 @@ export type PhotoMetadata = {
 };
 
 export type SavedRequest = RequestInput & {
+  department: string;
   id: string;
   request_reference: string;
   status: string;
@@ -29,6 +29,7 @@ export type SavedRequest = RequestInput & {
   proposed_appointment_at: string | null;
   call_video_details: string | null;
   tracking_token_hash: string;
+  dossier_token_hash?: string;
   created_at: string;
   updated_at: string;
   photos: PhotoMetadata[];

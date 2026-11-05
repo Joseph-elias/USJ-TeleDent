@@ -25,6 +25,7 @@ function load(relativePath, filesystem = fs) {
     if (id === "./filters") return load("src/lib/dentist/filters.ts", filesystem);
     if (id === "./request-details") return load("src/lib/dentist/request-details.ts", filesystem);
     if (id === "./validation") return load("src/lib/requests/validation.ts", filesystem);
+    if (id === "./routing") return load("src/lib/requests/routing.ts", filesystem);
     if (id === "@/lib/requests/evaluation") return load("src/lib/requests/evaluation.ts", filesystem);
     if (id === "@/components/patient/patient-data") return load("src/components/patient/patient-data.ts");
     return require(id);

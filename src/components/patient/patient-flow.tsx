@@ -3,14 +3,16 @@ import { useI18n } from "@/components/i18n";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { departments, emptyIdentity, identityFields, purposes, reasons, steps, type Identity } from "./patient-data";
+import { emptyIdentity, identityFields, purposes, reasons, steps, type Identity } from "./patient-data";
 import { RequestValidationError, validateRequest } from "@/lib/requests/validation";
+import { getUrgency } from "@/lib/requests/routing";
 import type { SubmissionResult } from "@/lib/requests/types";
 import { DictationTextarea } from "@/components/dictation-textarea";
 import { SubmissionConfirmation } from "./submission-confirmation";
 import { Icon, controlClass as control, primaryClass as primary, secondaryClass as secondary } from "@/components/ui";
 
 type Photo = { id: string; file: File; url: string };
+const emptyPatientIdentity = { ...emptyIdentity, rememberFileNumber: false, autofilledFileNumber: false };
 function EmergencyNotice() {
   const { t } = useI18n();
   return <aside aria-label={t("Urgence médicale")} className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-950">
@@ -21,6 +23,16 @@ function EmergencyNotice() {
       <p className="pb-2">{t("Ce formulaire ne fournit pas de diagnostic.")}</p>
     </details>
   </aside>;
+}
+
+function UrgencyNotice({ urgency }: { urgency: ReturnType<typeof getUrgency> }) {
+  const { t } = useI18n();
+  if (!urgency) return null;
+  return <p role="alert" className="mt-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
+    {urgency === "immediate"
+      ? t("Consultez immédiatement les urgences ou appelez les services d’urgence locaux. N’attendez pas une réponse en ligne.")
+      : t("Contactez dès maintenant un service d’urgence dentaire. N’attendez pas une réponse en ligne.")}
+  </p>;
 }
 
 function displayDate(value: string) {
@@ -44,11 +56,10 @@ export function PatientFlow() {
   const [step, setStep] = useState(0);
   const [returnToReview, setReturnToReview] = useState(false);
   const [purpose, setPurpose] = useState("");
-  const [identity, setIdentity] = useState<Identity>(emptyIdentity);
+  const [identity, setIdentity] = useState(emptyPatientIdentity);
   const [reasonId, setReasonId] = useState("");
   const [answersByReason, setAnswersByReason] = useState<Record<string, Record<string, string>>>({});
   const [description, setDescription] = useState("");
-  const [department, setDepartment] = useState("");
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [photoError, setPhotoError] = useState("");
@@ -61,7 +72,40 @@ export function PatientFlow() {
   const photoUrls = useRef(new Set<string>());
   const activeReason = reasons.find((reason) => reason.id === reasonId);
   const answers = answersByReason[reasonId] ?? {};
+  const urgency = getUrgency(reasonId, answers);
   const today = new Date().toLocaleDateString("en-CA");
+  const { name, birthDate } = identity;
+
+  useEffect(() => {
+    if (step !== 1 || !name.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(birthDate) || birthDate > today) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      const body = new FormData();
+      body.set("name", name);
+      body.set("birthDate", birthDate);
+      try {
+        const response = await fetch("/api/requests/dossier", { method: "POST", body, signal: controller.signal });
+        if (!response.ok) return;
+        const { fileNumber } = await response.json();
+        if (typeof fileNumber !== "string" || !fileNumber || controller.signal.aborted) return;
+        setIdentity((current) => current.name === name && current.birthDate === birthDate && !current.fileNumber
+          ? { ...current, fileNumber, autofilledFileNumber: true, rememberFileNumber: true }
+          : current);
+        setErrors((current) => {
+          if (!current.fileNumber) return current;
+          const next = { ...current };
+          delete next.fileNumber;
+          return next;
+        });
+      } catch {
+        // Manual entry is available if the browser cannot retrieve a saved number.
+      }
+    }, 350);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [step, name, birthDate, today]);
 
   useEffect(() => {
     heading.current?.focus();
@@ -80,6 +124,15 @@ export function PatientFlow() {
     setErrors({});
     setSubmissionError("");
     setStep(next);
+  }
+
+  function updateIdentity(field: keyof Identity, value: string) {
+    setIdentity((current) => {
+      if ((field === "name" || field === "birthDate") && current.autofilledFileNumber) {
+        return { ...current, [field]: value, fileNumber: "", autofilledFileNumber: false, rememberFileNumber: false };
+      }
+      return { ...current, [field]: value, autofilledFileNumber: field !== "fileNumber" && current.autofilledFileNumber };
+    });
   }
 
   function next(event: FormEvent<HTMLFormElement>) {
@@ -102,10 +155,9 @@ export function PatientFlow() {
       });
       if (!description.trim()) found.description = "Décrivez votre situation en quelques mots.";
     }
-    if (step === 5 && !department) found.department = "Choisissez un service.";
     setErrors(found);
     if (!Object.keys(found).length) {
-      if (returnToReview && step !== 2) { setReturnToReview(false); moveTo(6); }
+      if (returnToReview && step !== 2) { setReturnToReview(false); moveTo(steps.length); }
       else moveTo(step + 1);
     }
   }
@@ -157,7 +209,7 @@ export function PatientFlow() {
       payload = validateRequest({
         patient_name: identity.name, patient_file_number: identity.fileNumber,
         date_of_birth: identity.birthDate, phone: identity.phone, email: identity.email.trim(),
-        reason: reasonId, description, symptom_answers: answers, department,
+        reason: reasonId, description, symptom_answers: answers,
       });
     } catch (error) {
       setSubmissionError(error instanceof RequestValidationError ? error.message : "Vérifiez les informations de votre demande.");
@@ -167,7 +219,7 @@ export function PatientFlow() {
     setIsSubmitting(true);
     try {
       const form = new FormData();
-      form.set("data", JSON.stringify(payload));
+      form.set("data", JSON.stringify({ ...payload, remember_file_number: identity.rememberFileNumber }));
       photos.forEach((photo) => form.append("photos", photo.file));
       const response = await fetch("/api/requests", { method: "POST", body: form, cache: "no-store" });
       const result = await response.json();
@@ -179,7 +231,7 @@ export function PatientFlow() {
       photoUrls.current.forEach((url) => URL.revokeObjectURL(url));
       photoUrls.current.clear();
       setPhotos([]);
-      setIdentity(emptyIdentity);
+      setIdentity(emptyPatientIdentity);
       setAnswersByReason({});
       setDescription("");
     } catch {
@@ -206,23 +258,31 @@ export function PatientFlow() {
         <span className="icon-tile"><Icon name={(["plus", "clock", "calendar", "message"] as const)[index]} /></span>
         <span className="min-w-0 flex-1"><span className="block text-base font-semibold">{t(item.title)}</span><span className="mt-1.5 block text-sm leading-6 text-slate-500">{t(item.text)}</span><span aria-hidden="true" className="mt-3 flex items-center gap-2 text-xs font-semibold text-accent">{t("Commencer")}<Icon name="arrow" className="size-4" /></span></span>
       </button>)}</div>
-      <div className="mt-7 flex items-start gap-3 rounded-xl bg-light-blue p-4 text-xs leading-6 text-slate-600"><Icon name="file" className="mt-1 size-4 text-accent" /><p>{t("Préparez votre numéro de dossier USJ et, si vous le souhaitez, jusqu’à 3 photos. Après l’envoi, conservez votre lien privé pour retrouver le suivi.")}</p></div>
+      <div className="mt-7 flex items-start gap-3 rounded-xl bg-light-blue p-4 text-xs leading-6 text-slate-600"><Icon name="file" className="mt-1 size-4 text-accent" /><p>{t("Vous pouvez mémoriser votre numéro de dossier USJ sur cet appareil pour votre prochaine demande. Après l’envoi, conservez votre lien privé pour retrouver le suivi.")}</p></div>
     </> : <>
       <nav aria-label={t("Progression de la demande")} className="mb-6">
         <div className="mb-3 flex items-center justify-between gap-3 text-xs"><p className="font-semibold" aria-live="polite">{t("Étape {0} sur {1} · {2}", [step, steps.length, t(steps[step - 1])])}</p><span className="text-slate-500">{Math.round(step / steps.length * 100)} {t(" %")}</span></div>
-        <ol className="grid grid-cols-6 gap-2">{steps.map((label, index) => <li key={label} aria-current={step === index + 1 ? "step" : undefined}>
+        <ol className="grid grid-cols-5 gap-2">{steps.map((label, index) => <li key={label} aria-current={step === index + 1 ? "step" : undefined}>
           <span className={`block h-1.5 rounded-full ${index < step ? "bg-accent" : "bg-slate-200"}`} /><span aria-hidden="true" className={`mt-2 hidden text-[.6875rem] sm:block ${step === index + 1 ? "font-semibold text-navy" : "text-slate-500"}`}>{t(label)}</span><span className="sr-only">{t(label)}{index + 1 < step ? t(" : terminée") : ""}</span>
         </li>)}</ol>
       </nav>
       <form noValidate onSubmit={next} aria-busy={isSubmitting} className="surface p-5 sm:p-8">
         {Object.keys(errors).length > 0 && <div ref={errorSummary} tabIndex={-1} role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{t("Veuillez corriger les champs indiqués avant de continuer.")}</div>}
-        <p className="mb-6 text-sm text-slate-500">{step === 4 ? t("Les photos sont facultatives.") : step === 6 ? t("Vérifiez les informations avant de terminer.") : t("Les champs sont obligatoires, sauf indication contraire.")}</p>
+        <p className="mb-6 text-sm text-slate-500">{step === 4 ? t("Les photos sont facultatives.") : step === steps.length ? t("Vérifiez les informations avant de terminer.") : t("Les champs sont obligatoires, sauf indication contraire.")}</p>
+        {step >= 4 && urgency && <div className="mb-5"><UrgencyNotice urgency={urgency} /></div>}
 
         {step === 1 && <div className="grid gap-5 sm:grid-cols-2">{identityFields.map((field) => <div key={field.id}>
           <label htmlFor={field.id} className="text-sm font-semibold">{t(field.label)}</label>
-          <input id={field.id} name={field.id} type={field.type} dir={field.type === "tel" || field.type === "email" || field.id === "fileNumber" ? "ltr" : "auto"} inputMode={field.type === "tel" ? "tel" : field.type === "email" ? "email" : undefined} autoComplete={field.autocomplete} required={field.id !== "email"} maxLength={field.type === "date" ? undefined : field.id === "phone" ? 25 : 200} max={field.type === "date" ? today : undefined} value={identity[field.id]} onChange={(event) => setIdentity({ ...identity, [field.id]: event.target.value })} aria-invalid={!!errors[field.id]} aria-describedby={errors[field.id] ? `${field.id}-error` : undefined} className={control} />
+          <input id={field.id} name={field.id} type={field.type} dir={field.type === "tel" || field.type === "email" || field.id === "fileNumber" ? "ltr" : "auto"} inputMode={field.type === "tel" ? "tel" : field.type === "email" ? "email" : undefined} autoComplete={field.autocomplete} required={field.id !== "email"} maxLength={field.type === "date" ? undefined : field.id === "phone" ? 25 : 200} max={field.type === "date" ? today : undefined} value={identity[field.id]} onChange={(event) => updateIdentity(field.id, event.target.value)} aria-invalid={!!errors[field.id]} aria-describedby={errors[field.id] ? `${field.id}-error` : undefined} className={control} />
           {errorFor(field.id)}
-        </div>)}</div>}
+          {field.id === "fileNumber" && <p role="status" className="mt-2 text-xs text-slate-600">{identity.autofilledFileNumber && t("Numéro retrouvé sur cet appareil. Vérifiez-le avant de continuer.")}</p>}
+        </div>)}<label className="flex items-start gap-3 text-sm text-slate-600 sm:col-span-2">
+          <input type="checkbox" checked={identity.rememberFileNumber} onChange={(event) => {
+            const checked = event.target.checked;
+            setIdentity((current) => ({ ...current, rememberFileNumber: checked }));
+          }} className="mt-0.5 size-4 shrink-0 accent-navy" />
+          {t("Mémoriser mon numéro de dossier sur cet appareil pendant 90 jours.")}
+        </label></div>}
 
         {step === 2 && <fieldset><legend className="text-base font-semibold">{t("Quel est le motif principal de votre demande ?")}</legend><div className="mt-4 grid gap-3 sm:grid-cols-2">{reasons.map((reason) => <label key={reason.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 text-sm ${reasonId === reason.id ? "border-sky-600 bg-light-blue" : "border-slate-200"}`}>
           <input type="radio" name="reason" value={reason.id} checked={reasonId === reason.id} onChange={() => setReasonId(reason.id)} aria-describedby={errors.reason ? "reason-error" : undefined} className="size-4 shrink-0 accent-navy" />{t(reason.label)}
@@ -237,6 +297,7 @@ export function PatientFlow() {
               <option value="">{t("Choisir une réponse")}</option>{question.options.map((option) => <option key={option} value={option}>{t(option)}</option>)}
             </select> : question.description ? <DictationTextarea key={`${reasonId}-${question.id}`} id={`question-${question.id}`} required rows={3} maxLength={500} value={answers[question.id] ?? ""} onValueChange={value => setAnswersByReason(current => ({ ...current, [reasonId]: { ...current[reasonId], [question.id]: value } }))} onDictatingChange={active => setDictatingField(active ? question.id : null)} disabled={!!dictatingField && dictatingField !== question.id} aria-invalid={!!errors[question.id]} aria-describedby={errors[question.id] ? `${question.id}-error` : undefined} className={control} /> : <input id={`question-${question.id}`} required maxLength={500} value={answers[question.id] ?? ""} onChange={(event) => setAnswersByReason({ ...answersByReason, [reasonId]: { ...answers, [question.id]: event.target.value } })} aria-invalid={!!errors[question.id]} aria-describedby={errors[question.id] ? `${question.id}-error` : undefined} className={control} />}
             {errorFor(question.id)}
+            {urgency && getUrgency(reasonId, { [question.id]: answers[question.id] }) === urgency && <UrgencyNotice urgency={urgency} />}
           </div>)}
           <div><label htmlFor="description" className="text-sm font-semibold">{t("Décrivez votre situation ou votre question")}</label><DictationTextarea id="description" rows={5} required maxLength={4000} value={description} onValueChange={setDescription} onDictatingChange={active => setDictatingField(active ? "description" : null)} disabled={!!dictatingField && dictatingField !== "description"} aria-invalid={!!errors.description} aria-describedby={errors.description ? "description-error" : undefined} className={control} />{errorFor("description")}</div>
         </div>}
@@ -251,21 +312,16 @@ export function PatientFlow() {
           <PhotoGallery photos={photos} onRemove={removePhoto} />
         </div>}
 
-        {step === 5 && <fieldset><legend className="font-semibold">{t("À quel service souhaitez-vous adresser votre demande ?")}</legend><div className="mt-4 grid gap-3 sm:grid-cols-2">{departments.map((item) => <label key={item} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 text-sm ${department === item ? "border-sky-600 bg-light-blue" : "border-slate-200"}`}>
-          <input type="radio" name="department" checked={department === item} onChange={() => setDepartment(item)} value={item} aria-describedby={errors.department ? "department-error" : undefined} className="size-4 shrink-0 accent-navy" />{t(item)}
-        </label>)}</div>{errorFor("department")}</fieldset>}
-
-        {step === 6 && <div className="space-y-7">
+        {step === steps.length && <div className="space-y-7">
           <section aria-labelledby="summary-patient"><div className="section-heading"><h2 id="summary-patient">{t("Vos informations")}</h2><button type="button" disabled={isSubmitting || !!dictatingField} onClick={() => editStep(1)} className="text-link" aria-label={t("Modifier vos informations")}>{t("Modifier")}</button></div><dl className="mt-3 grid gap-4 sm:grid-cols-2">{identityFields.map((field) => <div key={field.id}><dt className="text-sm text-slate-500">{t(field.label)}</dt><dd className="mt-1 break-words text-sm font-medium">{field.id === "birthDate" ? t(displayDate(identity.birthDate)) : identity[field.id].trim() || t("Non renseigné")}</dd></div>)}</dl></section>
           <section aria-labelledby="summary-reason" className="border-t border-slate-200 pt-6"><div className="section-heading"><h2 id="summary-reason">{t("Votre demande")}</h2><button type="button" disabled={isSubmitting || !!dictatingField} onClick={() => editStep(2)} className="text-link" aria-label={t("Modifier votre demande")}>{t("Modifier")}</button></div><dl className="mt-3 space-y-4">
             <div><dt className="text-sm text-slate-500">{t("Parcours choisi")}</dt><dd className="mt-1 text-sm">{t(purpose)}</dd></div>
             <div><dt className="text-sm text-slate-500">{t("Motif de contact")}</dt><dd className="mt-1 text-sm font-semibold">{t(activeReason?.label)}</dd></div>
             {activeReason?.questions.map((question) => <div key={question.id}><dt className="text-sm text-slate-500">{t(question.label)}</dt><dd className="mt-1 whitespace-pre-wrap break-words text-sm">{question.options?.includes(answers[question.id]) ? t(answers[question.id]) : answers[question.id]?.trim() || t("Non renseigné")}</dd></div>)}
             <div><dt className="text-sm text-slate-500">{t("Description")}</dt><dd className="mt-1 whitespace-pre-wrap break-words text-sm">{description}</dd></div>
-            <div><div className="section-heading"><dt className="text-sm text-slate-500">{t("Service sélectionné")}</dt><button type="button" disabled={isSubmitting || !!dictatingField} onClick={() => editStep(5)} className="text-link" aria-label={t("Modifier le service")}>{t("Modifier")}</button></div><dd className="mt-1 text-sm font-semibold">{t(department)}</dd></div>
           </dl></section>
           <section aria-labelledby="summary-photos" className="border-t border-slate-200 pt-6"><div className="section-heading"><h2 id="summary-photos">{t("Photos jointes")}</h2><button type="button" disabled={isSubmitting || !!dictatingField} onClick={() => editStep(4)} className="text-link" aria-label={t("Modifier les photos")}>{t("Modifier")}</button></div>{photos.length ? <PhotoGallery photos={photos} /> : <p className="mt-2 text-sm text-slate-500">{t("Aucune photo jointe.")}</p>}</section>
-          <div className="rounded-xl bg-light-blue p-5 text-sm leading-6"><p id="submission-help">{t("En envoyant cette demande, vous enregistrez les informations et les photos sur le serveur local de ce prototype. Utilisez uniquement des données fictives.")}</p>
+          <div className="rounded-xl bg-light-blue p-5 text-sm leading-6"><p>{t("Vos réponses servent à orienter automatiquement votre demande vers un service.")}</p><p id="submission-help" className="mt-2">{t("En envoyant cette demande, vous enregistrez les informations et les photos sur le serveur local de ce prototype. Utilisez uniquement des données fictives.")}</p>
             <button type="submit" disabled={isSubmitting || !!dictatingField} aria-describedby="submission-help" className={`${primary} mt-4 w-full disabled:cursor-wait disabled:opacity-60 sm:w-auto`}>{isSubmitting ? t("Enregistrement en cours…") : t("Envoyer ma demande")}</button>
             <p role="status" className="mt-3">{isSubmitting ? t("Veuillez patienter pendant l’enregistrement de votre demande.") : ""}</p>
             {submissionError && <p role="alert" className="mt-3 font-semibold text-red-700">{t(submissionError)}</p>}
@@ -274,7 +330,7 @@ export function PatientFlow() {
 
         <div className="step-actions">
           <button type="button" disabled={isSubmitting || !!dictatingField} onClick={() => moveTo(step - 1)} className={`${secondary} disabled:opacity-60`}><Icon name="back" className="size-4" />{step === 1 ? t("Retour") : t("Précédent")}</button>
-          {step < 6 && <button type="submit" disabled={!!dictatingField} className={primary}>{returnToReview && step !== 2 ? t("Valider") : step === 5 ? t("Récapitulatif") : t("Continuer")}<Icon name="arrow" className="size-4" /></button>}
+          {step < steps.length && <button type="submit" disabled={!!dictatingField} className={primary}>{returnToReview && step !== 2 ? t("Valider") : step === steps.length - 1 ? t("Récapitulatif") : t("Continuer")}<Icon name="arrow" className="size-4" /></button>}
         </div>
       </form>
     </>}

@@ -1,6 +1,8 @@
-import { saveRequest } from "@/lib/requests/storage";
+import { NextResponse } from "next/server";
+import { isHttps } from "@/lib/dentist/http";
+import { dossierCookieMaxAge, dossierCookieName, saveRequest } from "@/lib/requests/storage";
 import { RequestValidationError, validateRequest } from "@/lib/requests/validation";
-import { BodyTooLargeError, privateJson, readRequestForm } from "@/lib/requests/http";
+import { BodyTooLargeError, privateHeaders, privateJson, readRequestForm } from "@/lib/requests/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +33,14 @@ export async function POST(request: Request) {
     const input = validateRequest(data);
     const photos = form.getAll("photos");
     if (photos.some((photo) => !(photo instanceof File))) throw new RequestValidationError("Les photos reçues sont invalides.");
-    return privateJson(await saveRequest(input, photos as File[]), 201);
+    const rememberDossier = (data as Record<string, unknown>).remember_file_number === true;
+    const { result, dossierCookie } = await saveRequest(input, photos as File[], rememberDossier);
+    const response = NextResponse.json(result, { status: 201, headers: privateHeaders });
+    response.cookies.set(dossierCookieName, dossierCookie ?? "", {
+      httpOnly: true, sameSite: "strict", secure: isHttps(request),
+      path: "/api/requests/dossier", maxAge: dossierCookie ? dossierCookieMaxAge : 0,
+    });
+    return response;
   } catch (error) {
     if (error instanceof RequestValidationError) return privateJson({ error: error.message }, 400);
     // Do not log the request body, private URLs, tokens, or patient information.
