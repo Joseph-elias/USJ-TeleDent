@@ -43,6 +43,8 @@ Use the top language selector to choose **Français**, **English** or **العر
 
 ## Local installation
 
+**New to Mac?** Follow the [complete MacBook setup guide](docs/mac-setup-guide.md), including opening Terminal, installing Node.js, starting/stopping the website, troubleshooting, and doctor emails/passwords for all six departments.
+
 Use Node.js 22.23.3 or newer with npm (tested with 22.23.3). Confirm `node --version` and `npm --version` work in your terminal. If you use a Node version manager, activate your installed Node version first.
 
 From the project directory:
@@ -55,11 +57,15 @@ No environment variables, database credentials, or external services are require
 
 ## Start development
 
+This project uses **port 3001** by default for both `npm run dev` and `npm start`, as configured in `package.json`. Your other project can continue running on port 3000.
+
 ```sh
 npm run dev -- --hostname 127.0.0.1
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000). Binding to loopback keeps this prototype on your machine. The portal links open `/patient` and `/dentist`.
+Open [http://127.0.0.1:3001](http://127.0.0.1:3001). Binding to loopback keeps this prototype on your machine. The portal links open `/patient` and `/dentist`.
+
+If USJ TeleDent was already running before the port change, stop its Terminal command with **Control + C**, then run the command above again. Leave the other project's server running. If port 3001 is also occupied, use `npm run dev -- --hostname 127.0.0.1 --port 3002` and open `http://127.0.0.1:3002` instead.
 
 ## Validation
 
@@ -79,7 +85,7 @@ npm run build
 npm start -- --hostname 127.0.0.1
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000). This command is for checking the build locally, not deploying it.
+Open [http://127.0.0.1:3001](http://127.0.0.1:3001). This command is for checking the build locally, not deploying it.
 
 ## Structure
 
@@ -140,7 +146,7 @@ npm run dev -- --hostname 127.0.0.1
 
 The account command creates **one fictional dentist for each of the six existing departments** in `.local-data/dentists.json`, using the shared [test accounts and passwords](docs/dentist-test-accounts.md) committed for local demonstrations. It also runs automatically after `npm ci`. Passwords in the repository are visible to everyone with repository access; use fictional patient data only. Local accounts store salted password hashes. No account or patient file is overwritten. Running the command again reports that the accounts already exist and leaves them unchanged, including older accounts and passwords. There is no public registration, password-reset page, or account-management API.
 
-Open [http://127.0.0.1:3000/dentist/login](http://127.0.0.1:3000/dentist/login) and enter a generated email and password. Visiting `/dentist` without a valid session redirects to login. The dashboard displays the dentist's identity, department, summary cards, and request table. Select a reference to open clinical details and the Step 7 evaluation panel. The original patient information and photos remain read-only. The sidebar provides **Se déconnecter**.
+Open [http://127.0.0.1:3001/dentist/login](http://127.0.0.1:3001/dentist/login) and enter a generated email and password. Visiting `/dentist` without a valid session redirects to login. The dashboard displays the dentist's identity, department, summary cards, and request table. Select a reference to open clinical details and the Step 7 evaluation panel. The original patient information and photos remain read-only. The sidebar provides **Se déconnecter**.
 
 ### Test two departments
 
@@ -267,7 +273,7 @@ Use fictional data only. No automatic diagnosis, real booking, phone/video integ
 
 ## Step 4: Test submission and private tracking locally
 
-Run `npm run dev -- --hostname 127.0.0.1` and open [http://127.0.0.1:3000/patient](http://127.0.0.1:3000/patient). No `.env.local`, Supabase project, or credentials are needed. Use only fictional values, for example **Patient Fictif**, dossier **TEST-LOCAL**, birth date **15/04/1990**, and phone **+961 70 123 456** (not for contacting anyone).
+Run `npm run dev -- --hostname 127.0.0.1` and open [http://127.0.0.1:3001/patient](http://127.0.0.1:3001/patient). No `.env.local`, Supabase project, or credentials are needed. Use only fictional values, for example **Patient Fictif**, dossier **TEST-LOCAL**, birth date **15/04/1990**, and phone **+961 70 123 456** (not for contacting anyone).
 
 1. Choose one of the four patient entry options.
 2. Try **Suivant** with empty identification fields: French validation errors should appear. Fill in the required fields; email is optional. A future birth date or invalid email/phone is rejected.

@@ -11,7 +11,7 @@ npm run dev -- --hostname 127.0.0.1
 
 `npm ci` automatically runs `npm run dentists:seed`, which creates these six accounts in `.local-data/dentists.json`. If installation scripts were disabled, run `npm run dentists:seed` yourself.
 
-Open [Dentist login](http://127.0.0.1:3000/dentist/login).
+Open [Dentist login](http://127.0.0.1:3001/dentist/login).
 
 | Department | Email | Password |
 |---|---|---|
